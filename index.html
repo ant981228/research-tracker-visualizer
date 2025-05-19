@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Research Tracker Visualizer</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- Include D3.js for visualizations -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- Include forceGraph library with specific version -->
+    <script src="https://unpkg.com/force-graph@1.43.1/dist/force-graph.min.js"></script>
+    <!-- Include highlighting for raw data view -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github.min.css">
+</head>
+<body>
+    <header>
+        <h1>Research Tracker Visualizer</h1>
+    </header>
+
+    <main>
+        <section id="upload-section">
+            <h2>Import Research Data</h2>
+            <div class="upload-container">
+                <input type="file" id="file-input" accept=".json,.txt">
+                <label for="file-input" class="file-label">Choose a file</label>
+                <div id="file-name">No file selected</div>
+                <button id="import-btn" disabled>Import Data</button>
+            </div>
+            <div class="sample-data">
+                <h3>Or try a sample:</h3>
+                <button id="sample-data-btn">Load Sample Data</button>
+            </div>
+        </section>
+
+        <section id="visualization-container" class="hidden">
+            <div class="controls">
+                <div class="view-selector">
+                    <button data-view="timeline" class="active">Timeline View</button>
+                    <button data-view="raw">Raw Data</button>
+                </div>
+                <div class="timeline-settings">
+                    <div class="timeline-buttons">
+                        <button id="expand-all-btn" class="timeline-btn">Expand All</button>
+                        <button id="collapse-all-btn" class="timeline-btn">Collapse All</button>
+                    </div>
+                </div>
+            </div>
+            
+<!-- Removed graph view -->
+            
+            <div id="timeline-view" class="view-pane hidden">
+                <div id="timeline-container"></div>
+            </div>
+            
+            <div id="raw-view" class="view-pane hidden">
+                <div id="session-info"></div>
+                <div class="raw-data-container">
+                    <div id="raw-data"></div>
+                </div>
+            </div>
+
+            <div id="details-panel">
+                <div class="panel-header">
+                    <h3>Details</h3>
+                    <button id="close-details">×</button>
+                </div>
+                <div id="details-content">
+                    <p>Select a node to see details</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>Research Tracker Visualizer | <a href="https://github.com/your-repo-link" target="_blank">View on GitHub</a></p>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="js/dataProcessor.js"></script>
+    <script src="js/graphView.js"></script>
+    <script src="js/timelineView.js"></script>
+    <script src="js/rawView.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>
