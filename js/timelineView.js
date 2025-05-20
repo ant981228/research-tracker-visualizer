@@ -143,15 +143,17 @@ class TimelineView {
                     }
                 });
                 
-                // Add details button
-                const detailsButton = document.createElement('button');
-                detailsButton.className = 'details-button';
-                detailsButton.textContent = 'Details';
-                detailsButton.addEventListener('click', (e) => {
-                    e.stopPropagation(); // Don't trigger the entry click (collapse/expand)
-                    this.detailsCallback(group.search);
-                });
-                searchEntry.appendChild(detailsButton);
+                // Find and remove the details button that was added in _createTimelineEntry
+                const existingButtonsContainer = searchEntry.querySelector('.timeline-buttons-container');
+                if (existingButtonsContainer) {
+                    const detailsButton = existingButtonsContainer.querySelector('.details-button');
+                    if (detailsButton) {
+                        detailsButton.addEventListener('click', (e) => {
+                            e.stopPropagation(); // Don't trigger the entry click (collapse/expand)
+                            this.detailsCallback(group.search);
+                        });
+                    }
+                }
                 
                 // Add the search entry to the search group
                 searchGroup.appendChild(searchEntry);
@@ -210,11 +212,25 @@ class TimelineView {
             second: '2-digit' 
         });
         
+        // Create timestamp container (for timestamp and note indicator)
+        const timestampContainer = document.createElement('div');
+        timestampContainer.className = 'timeline-timestamp-container';
+        
         // Create timestamp element
         const timestamp = document.createElement('div');
         timestamp.className = 'timeline-timestamp';
         timestamp.textContent = time;
-        entry.appendChild(timestamp);
+        timestampContainer.appendChild(timestamp);
+        
+        // Add note indicator next to timestamp if this is a page visit with notes
+        if (event.type === 'pageVisit' && event.notes && event.notes.length > 0) {
+            const noteIndicator = document.createElement('div');
+            noteIndicator.className = 'note-indicator';
+            noteIndicator.innerHTML = `<small>(${event.notes.length} note${event.notes.length > 1 ? 's' : ''})</small>`;
+            timestampContainer.appendChild(noteIndicator);
+        }
+        
+        entry.appendChild(timestampContainer);
         
         // Create content container
         const content = document.createElement('div');
@@ -225,7 +241,6 @@ class TimelineView {
             content.innerHTML = `
                 <h4>Search: "${event.query}"</h4>
                 <div class="timeline-url">${this._getEngineName(event.engine)}</div>
-                <div class="timeline-url">${event.url}</div>
             `;
             
             // Add notes if available
@@ -248,95 +263,63 @@ class TimelineView {
             
             content.innerHTML = `
                 <h4>${event.title || metadata.title || 'Untitled Page'}</h4>
-                <div class="timeline-url">${event.url}</div>
             `;
             
-            // Add source search if available
-            if (event.sourceSearch) {
-                const source = document.createElement('div');
-                source.className = 'timeline-source';
-                source.innerHTML = `
-                    <span class="timeline-source-label">From search:</span>
-                    <span class="timeline-source-query">"${event.sourceSearch.query}"</span>
-                `;
-                content.appendChild(source);
-            }
+            // Removed "From search" information as it's already visually indicated by the layout
             
-            // Add metadata if available
-            if (metadata && (metadata.author || metadata.publishDate)) {
-                const metaContainer = document.createElement('div');
-                metaContainer.className = 'timeline-metadata';
-                
-                if (metadata.author) {
-                    const author = document.createElement('div');
-                    author.className = 'timeline-author';
-                    author.textContent = `Author: ${metadata.author}`;
-                    metaContainer.appendChild(author);
-                }
-                
-                if (metadata.publishDate) {
-                    const date = document.createElement('div');
-                    date.className = 'timeline-publish-date';
-                    date.textContent = `Published: ${metadata.publishDate}`;
-                    metaContainer.appendChild(date);
-                }
-                
-                content.appendChild(metaContainer);
-            }
-            
-            // Add notes if available
-            if (event.notes && event.notes.length > 0) {
-                const notesContainer = document.createElement('div');
-                notesContainer.className = 'timeline-notes';
-                
-                event.notes.forEach(note => {
-                    const noteEl = document.createElement('div');
-                    noteEl.className = 'timeline-note';
-                    noteEl.textContent = note.content;
-                    notesContainer.appendChild(noteEl);
-                });
-                
-                content.appendChild(notesContainer);
-            }
+            // Notes indicator now moved to the timestamp area
         } 
         else if (event.type === 'note') {
             content.innerHTML = `
                 <h4>Note Added</h4>
                 <div class="timeline-note-content">${event.content}</div>
-                ${event.url ? `<div class="timeline-url">Added on: ${event.url}</div>` : ''}
                 ${event.orphaned ? '<div class="timeline-orphaned">(Standalone note)</div>' : ''}
             `;
         }
         
         entry.appendChild(content);
         
-        // For page entries, add a details button instead of making the whole entry clickable
-        if (event.type === 'pageVisit') {
+        // Create buttons container
+        const buttonContainer = document.createElement('div');
+        buttonContainer.className = 'timeline-buttons-container';
+        
+        // Add visit button for searches and page visits
+        if (event.url && (event.type === 'search' || event.type === 'pageVisit')) {
+            const visitButton = document.createElement('a');
+            visitButton.className = 'visit-button';
+            visitButton.textContent = event.type === 'search' ? 'Visit Search' : 'Visit Page';
+            visitButton.href = event.url;
+            visitButton.target = '_blank';
+            visitButton.rel = 'noopener noreferrer';
+            visitButton.addEventListener('click', (e) => {
+                e.stopPropagation(); // Don't trigger any parent click handlers
+            });
+            buttonContainer.appendChild(visitButton);
+        }
+        
+        // Add details button
+        if (event.type === 'search' || event.type === 'pageVisit' || event.type === 'note') {
             const detailsButton = document.createElement('button');
             detailsButton.className = 'details-button';
             detailsButton.textContent = 'Details';
             detailsButton.addEventListener('click', (e) => {
                 e.stopPropagation(); // Don't trigger any parent click handlers
-                // Rename pageVisit to page for consistency with showNodeDetails expectations
-                const pageData = {
-                    ...event,
-                    type: 'page'
-                };
-                this.detailsCallback(pageData);
+                
+                // For pageVisit, rename to 'page' for consistency with showNodeDetails expectations
+                if (event.type === 'pageVisit') {
+                    const pageData = {
+                        ...event,
+                        type: 'page'
+                    };
+                    this.detailsCallback(pageData);
+                } else {
+                    this.detailsCallback(event);
+                }
             });
-            entry.appendChild(detailsButton);
+            buttonContainer.appendChild(detailsButton);
         }
         
-        // For standalone notes, add a details button
-        if (event.type === 'note') {
-            const detailsButton = document.createElement('button');
-            detailsButton.className = 'details-button';
-            detailsButton.textContent = 'Details';
-            detailsButton.addEventListener('click', () => {
-                this.detailsCallback(event);
-            });
-            entry.appendChild(detailsButton);
-        }
+        entry.appendChild(buttonContainer);
         
         return entry;
     }

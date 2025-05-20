@@ -1,7 +1,7 @@
 /* Base Styles */
 :root {
-    --primary-color: #3498db;
-    --secondary-color: #2980b9;
+    --primary-color: #1a4b78;
+    --secondary-color: #0f3358;
     --background-color: #f5f8fa;
     --card-color: #ffffff;
     --text-color: #2c3e50;
@@ -418,8 +418,13 @@ input[type="file"] {
     margin-bottom: 0.4rem;
 }
 
-.details-button {
+.timeline-buttons-container {
+    display: flex;
+    gap: 0.5rem;
     margin-left: auto;
+}
+
+.details-button {
     background-color: var(--primary-color);
     color: white;
     border: none;
@@ -434,10 +439,39 @@ input[type="file"] {
     background-color: var(--secondary-color);
 }
 
+.visit-button {
+    background-color: var(--success-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    text-decoration: none;
+    display: inline-block;
+}
+
+.visit-button:hover {
+    background-color: #27ae60;
+}
+
+.timeline-timestamp-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.3rem;
+}
+
 .timeline-timestamp {
     color: #666;
     font-size: 0.8rem;
-    margin-bottom: 0.3rem;
+}
+
+.note-indicator {
+    color: #777;
+    font-style: italic;
+    font-size: 0.7rem;
 }
 
 .timeline-content h4 {
@@ -450,6 +484,7 @@ input[type="file"] {
     margin-bottom: 0.5rem;
     word-break: break-all;
 }
+
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
