@@ -319,6 +319,23 @@ class TimelineView {
             buttonContainer.appendChild(detailsButton);
         }
         
+        // Add cards button directly (only for page visits)
+        // It will have an initial "0 Cards" text that can be updated later
+        if (event.type === 'pageVisit') {
+            const cardsButton = document.createElement('button');
+            cardsButton.className = 'view-cards-btn';
+            cardsButton.textContent = '0 Cards';
+            
+            // Store page info in data attributes for later update
+            cardsButton.setAttribute('data-url', event.url || '');
+            cardsButton.setAttribute('data-title', event.title || '');
+            
+            // Set disabled initially - will be enabled if matching sections are found
+            cardsButton.disabled = true;
+            
+            buttonContainer.appendChild(cardsButton);
+        }
+        
         entry.appendChild(buttonContainer);
         
         return entry;

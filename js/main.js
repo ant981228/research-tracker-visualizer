@@ -8,7 +8,8 @@ document.addEventListener('DOMContentLoaded', () => {
         currentView: 'timeline',  // 'timeline' or 'raw'
         data: null,
         detailsOpen: false,
-        expandedSearches: new Set() // Track which searches are expanded
+        expandedSearches: new Set(), // Track which searches are expanded
+        docLoaded: false
     };
 
     // DOM Elements
@@ -23,15 +24,31 @@ document.addEventListener('DOMContentLoaded', () => {
         viewPanes: document.querySelectorAll('.view-pane'),
         timelineSettings: {
             expandAllBtn: document.getElementById('expand-all-btn'),
-            collapseAllBtn: document.getElementById('collapse-all-btn')
+            collapseAllBtn: document.getElementById('collapse-all-btn'),
+            goHomeBtn: document.getElementById('go-home-btn')
         },
         detailsPanel: document.getElementById('details-panel'),
         closeDetails: document.getElementById('close-details'),
-        detailsContent: document.getElementById('details-content')
+        detailsContent: document.getElementById('details-content'),
+        docInput: document.getElementById('doc-input'),
+        docName: document.getElementById('doc-name'),
+        docStatus: document.getElementById('doc-status'),
+        docSectionsContainer: document.getElementById('doc-sections-container'),
+        docSectionsList: document.getElementById('doc-sections-list'),
+        sectionsModal: document.getElementById('sections-modal'),
+        sectionsModalTitle: document.getElementById('sections-modal-title'),
+        sectionsModalSubtitle: document.getElementById('sections-modal-subtitle'),
+        sectionsModalBody: document.getElementById('sections-modal-body'),
+        sectionsModalClose: document.getElementById('sections-modal-close'),
+        sectionsBackBtn: document.getElementById('sections-back-btn'),
+        helpBtn: document.getElementById('help-btn'),
+        helpModal: document.getElementById('help-modal'),
+        helpModalClose: document.getElementById('help-modal-close')
     };
 
     // Initialize components
     const dataProcessor = new DataProcessor();
+    const docProcessor = new DocProcessor();
     const timelineView = new TimelineView('timeline-container', showNodeDetails);
     const rawView = new RawView('session-info', 'raw-data');
 
@@ -60,8 +77,73 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.timelineSettings.collapseAllBtn.addEventListener('click', collapseAllSearches);
         }
         
+        // Go Home button
+        if (elements.timelineSettings.goHomeBtn) {
+            elements.timelineSettings.goHomeBtn.addEventListener('click', goHome);
+        }
+        
         // Details panel close button
         elements.closeDetails.addEventListener('click', closeDetails);
+        
+        // Document input change
+        elements.docInput.addEventListener('change', handleDocSelect);
+        
+        // Sections modal close button
+        elements.sectionsModalClose.addEventListener('click', closeSectionsModal);
+        
+        // Sections back button
+        elements.sectionsBackBtn.addEventListener('click', closeSectionsModal);
+        
+        // Add global keyboard listener for Escape key
+        document.addEventListener('keydown', handleKeyPress);
+        
+        // Help button
+        if (elements.helpBtn) {
+            elements.helpBtn.addEventListener('click', showHelpModal);
+        }
+        
+        // Help modal close button
+        if (elements.helpModalClose) {
+            elements.helpModalClose.addEventListener('click', closeHelpModal);
+        }
+    }
+    
+    /**
+     * Show the help modal
+     */
+    function showHelpModal() {
+        elements.helpModal.classList.add('active');
+    }
+    
+    /**
+     * Close the help modal
+     */
+    function closeHelpModal() {
+        elements.helpModal.classList.remove('active');
+    }
+    
+    /**
+     * Handle keyboard events like Escape key
+     * @param {KeyboardEvent} event - The keyboard event
+     */
+    function handleKeyPress(event) {
+        // Check if Escape key was pressed
+        if (event.key === 'Escape') {
+            // Close any open panels or modals
+            if (state.detailsOpen) {
+                closeDetails();
+            }
+            
+            // Close sections modal if open
+            if (elements.sectionsModal.classList.contains('active')) {
+                closeSectionsModal();
+            }
+            
+            // Close help modal if open
+            if (elements.helpModal.classList.contains('active')) {
+                closeHelpModal();
+            }
+        }
     }
 
     /**
@@ -78,6 +160,85 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.fileName.textContent = 'No file selected';
             elements.importBtn.disabled = true;
         }
+    }
+    
+    /**
+     * Handle document selection
+     * @param {Event} event - Change event from document input
+     */
+    async function handleDocSelect(event) {
+        const file = event.target.files[0];
+        
+        if (file) {
+            elements.docName.textContent = file.name;
+            elements.docStatus.textContent = 'Processing document...';
+            elements.docStatus.className = 'doc-status';
+            elements.docSectionsContainer.classList.add('hidden');
+            elements.docSectionsList.innerHTML = '';
+            
+            try {
+                const success = await docProcessor.processDocument(file);
+                
+                if (success) {
+                    state.docLoaded = true;
+                    elements.docStatus.textContent = `Document processed successfully (${docProcessor.sections.length} sections found)`;
+                    elements.docStatus.className = 'doc-status success';
+                    
+                    // Display the sections list
+                    displayDocumentSections(docProcessor.sections);
+                    
+                    // If data is already loaded, update the content page entries with section buttons
+                    // Use a slight delay to ensure DOM is ready
+                    if (state.isDataLoaded) {
+                        console.log("Data already loaded, updating content pages with sections");
+                        setTimeout(() => {
+                            updateContentPagesWithSections();
+                        }, 100);
+                    }
+                } else {
+                    elements.docStatus.textContent = 'Error processing document';
+                    elements.docStatus.className = 'doc-status error';
+                }
+            } catch (error) {
+                elements.docStatus.textContent = `Error: ${error.message}`;
+                elements.docStatus.className = 'doc-status error';
+                console.error('Error processing document:', error);
+            }
+        } else {
+            elements.docName.textContent = 'No document selected';
+            elements.docStatus.textContent = '';
+            elements.docStatus.className = 'doc-status';
+            elements.docSectionsContainer.classList.add('hidden');
+            elements.docSectionsList.innerHTML = '';
+        }
+    }
+    
+    /**
+     * Display the sections detected in the document
+     * @param {Array} sections - Array of section objects
+     */
+    function displayDocumentSections(sections) {
+        if (!sections || sections.length === 0) {
+            elements.docSectionsContainer.classList.add('hidden');
+            return;
+        }
+        
+        elements.docSectionsList.innerHTML = '';
+        
+        // Create a section item for each section
+        sections.forEach(section => {
+            const sectionItem = document.createElement('div');
+            sectionItem.className = 'doc-section-item';
+            
+            const sectionTitle = document.createElement('div');
+            sectionTitle.className = `section-level-${section.level}`;
+            sectionTitle.textContent = section.title;
+            
+            sectionItem.appendChild(sectionTitle);
+            elements.docSectionsList.appendChild(sectionItem);
+        });
+        
+        elements.docSectionsContainer.classList.remove('hidden');
     }
 
     /**
@@ -109,6 +270,15 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Initialize views with data
             initializeViews();
+            
+            // Update content pages with sections if document is loaded
+            if (state.docLoaded) {
+                console.log("Document already loaded, updating content pages with sections");
+                // Use a slight delay to ensure views are fully initialized
+                setTimeout(() => {
+                    updateContentPagesWithSections();
+                }, 300);
+            }
         } catch (error) {
             showError(`Error importing data: ${error.message}`);
         }
@@ -511,6 +681,15 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Initialize views with data
             initializeViews();
+            
+            // Update content pages with sections if document is loaded
+            if (state.docLoaded) {
+                console.log("Document already loaded, updating content pages with sections");
+                // Use a slight delay to ensure views are fully initialized
+                setTimeout(() => {
+                    updateContentPagesWithSections();
+                }, 300);
+            }
         } catch (error) {
             console.error('Error loading sample data:', error);
             showError(`Error loading sample data: ${error.message}`);
@@ -621,6 +800,146 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
+     * Update content pages with section buttons
+     */
+    function updateContentPagesWithSections() {
+        if (!state.docLoaded || !state.isDataLoaded) return;
+        
+        console.log("Updating content pages with sections...");
+        
+        const pageEntries = document.querySelectorAll('.timeline-entry.pageVisit');
+        console.log(`Found ${pageEntries.length} page entries`);
+        
+        pageEntries.forEach(entry => {
+            const url = entry.getAttribute('data-url');
+            const title = entry.querySelector('h4')?.textContent;
+            
+            if (!url && !title) return;
+            
+            console.log(`Processing page: ${title || url}`);
+            
+            // Find matching page data
+            const pageData = state.data.timeline.find(event => {
+                return event.type === 'pageVisit' && 
+                      (event.url === url || event.title === title);
+            });
+            
+            if (!pageData) {
+                console.log("No matching page data found");
+                return;
+            }
+            
+            // Find matching sections
+            const matchingSections = docProcessor.findMatchingSections(pageData);
+            console.log(`Found ${matchingSections.length} matching sections for: ${title || url}`);
+            
+            // Find the cards button
+            const cardsButton = entry.querySelector('.view-cards-btn');
+            if (!cardsButton) {
+                console.log("No cards button found");
+                return;
+            }
+            
+            if (matchingSections.length > 0) {
+                console.log(`Enabling cards button with ${matchingSections.length} cards`);
+                // Update button text and enable it
+                cardsButton.textContent = `View ${matchingSections.length} Card${matchingSections.length !== 1 ? 's' : ''}`;
+                cardsButton.disabled = false;
+                
+                // Remove existing event listeners by cloning the node
+                const newCardsButton = cardsButton.cloneNode(true);
+                cardsButton.parentNode.replaceChild(newCardsButton, cardsButton);
+                
+                // Add click handler to the new button
+                newCardsButton.addEventListener('click', () => {
+                    console.log("Cards button clicked, showing sections");
+                    showSections(pageData, matchingSections);
+                });
+                
+                // Update styling to make it stand out
+                newCardsButton.style.opacity = '1';
+            } else {
+                console.log("No matching sections, keeping button disabled");
+                // Keep button disabled and show 0 Cards
+                cardsButton.textContent = '0 Cards';
+                cardsButton.disabled = true;
+                cardsButton.style.opacity = '0.6';
+            }
+        });
+        
+        console.log("Finished updating content pages with sections");
+    }
+    
+    /**
+     * Show sections modal for a page
+     * @param {Object} page - Page data
+     * @param {Array} sections - Matching sections
+     */
+    function showSections(page, sections) {
+        if (!page || !sections || sections.length === 0) return;
+        
+        // Set modal title and subtitle
+        elements.sectionsModalTitle.textContent = page.title || 'Page Content';
+        elements.sectionsModalSubtitle.textContent = `Found ${sections.length} matching section${sections.length !== 1 ? 's' : ''} in "${docProcessor.getDocumentName()}"`;
+        
+        // Clear modal body content
+        elements.sectionsModalBody.innerHTML = '';
+        
+        // Add each section
+        sections.forEach(section => {
+            const sectionElement = document.createElement('div');
+            sectionElement.className = 'section-item';
+            
+            const sectionHeader = document.createElement('div');
+            sectionHeader.className = 'section-header';
+            sectionHeader.textContent = section.title;
+            
+            const sectionContent = document.createElement('div');
+            sectionContent.className = 'section-content';
+            
+            // Highlight matches in content
+            let highlightedContent = section.content;
+            
+            // Highlight title matches
+            if (page.title) {
+                const titleRegex = new RegExp(escapeRegExp(page.title), 'gi');
+                highlightedContent = highlightedContent.replace(titleRegex, 
+                    match => `<span class="section-match-highlight">${match}</span>`);
+            }
+            
+            // Highlight URL matches (if present in text)
+            if (page.url) {
+                // Extract domain for simpler matching
+                const urlParts = page.url.split('/');
+                const domain = urlParts[2]; // e.g., "www.example.com"
+                
+                if (domain) {
+                    const domainRegex = new RegExp(escapeRegExp(domain), 'gi');
+                    highlightedContent = highlightedContent.replace(domainRegex,
+                        match => `<span class="section-match-highlight">${match}</span>`);
+                }
+            }
+            
+            sectionContent.innerHTML = highlightedContent;
+            
+            sectionElement.appendChild(sectionHeader);
+            sectionElement.appendChild(sectionContent);
+            
+            elements.sectionsModalBody.appendChild(sectionElement);
+        });
+        
+        // Show the modal
+        elements.sectionsModal.classList.add('active');
+    }
+    
+    /**
+     * Close the sections modal
+     */
+    function closeSectionsModal() {
+        elements.sectionsModal.classList.remove('active');
+    }
+
+    /**
      * Show node details in the details panel
      * @param {Object} node - Node data
      */
@@ -715,6 +1034,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 content += '</div>';
             }
+            
+            // Add document sections button at the bottom if document is loaded
+            if (state.docLoaded) {
+                const matchingSections = docProcessor.findMatchingSections(node);
+                
+                if (matchingSections.length > 0) {
+                    content += `
+                        <div class="details-sections">
+                            <button class="sections-btn" id="details-sections-btn" data-page-url="${node.url}">
+                                View ${matchingSections.length} Card${matchingSections.length !== 1 ? 's' : ''}
+                            </button>
+                        </div>
+                    `;
+                }
+            }
         } 
         else if (node.type === 'note') {
             content = `
@@ -742,6 +1076,19 @@ document.addEventListener('DOMContentLoaded', () => {
         // Update the details content
         elements.detailsContent.innerHTML = content;
         
+        // Set up the sections button if it exists
+        const sectionsBtn = document.getElementById('details-sections-btn');
+        if (sectionsBtn) {
+            sectionsBtn.addEventListener('click', () => {
+                const pageUrl = sectionsBtn.getAttribute('data-page-url');
+                const matchingSections = docProcessor.findMatchingSections(node);
+                
+                if (matchingSections.length > 0) {
+                    showSections(node, matchingSections);
+                }
+            });
+        }
+        
         // Show the details panel
         elements.detailsPanel.classList.add('open');
         state.detailsOpen = true;
@@ -761,6 +1108,43 @@ document.addEventListener('DOMContentLoaded', () => {
     function showVisualization() {
         elements.uploadSection.classList.add('hidden');
         elements.visualizationContainer.classList.remove('hidden');
+    }
+    
+    /**
+     * Go back to the upload screen
+     */
+    function goHome() {
+        // Hide visualization and show upload section
+        elements.visualizationContainer.classList.add('hidden');
+        elements.uploadSection.classList.remove('hidden');
+        
+        // Reset file inputs and status
+        elements.fileInput.value = '';
+        elements.fileName.textContent = 'No file selected';
+        elements.importBtn.disabled = true;
+        
+        // Reset document input if present
+        if (elements.docInput) {
+            elements.docInput.value = '';
+            elements.docName.textContent = 'No document selected';
+            elements.docStatus.textContent = '';
+            elements.docStatus.className = 'doc-status';
+            elements.docSectionsContainer.classList.add('hidden');
+            elements.docSectionsList.innerHTML = '';
+        }
+        
+        // Reset state
+        state.isDataLoaded = false;
+        state.data = null;
+        state.expandedSearches = new Set();
+        state.docLoaded = false;
+        
+        // Reset processors
+        docProcessor.reset();
+        
+        // Close any open panels
+        closeDetails();
+        closeSectionsModal();
     }
 
     /**
@@ -801,6 +1185,15 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         
         return engineMap[engineCode] || engineCode;
+    }
+    
+    /**
+     * Escape regular expression special characters
+     * @param {string} string - String to escape
+     * @returns {string} - Escaped string
+     */
+    function escapeRegExp(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
     // Initialize application

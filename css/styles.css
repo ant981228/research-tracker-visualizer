@@ -102,12 +102,37 @@ button:disabled {
 }
 
 /* Upload Section */
+.intro-text {
+    text-align: center;
+    margin-bottom: 2rem;
+    color: var(--text-color);
+    font-size: 1.1rem;
+}
+
+.main-upload-area {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
 .upload-container {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 1rem;
-    margin-bottom: 1.5rem;
+    padding: 1.5rem;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.upload-container h3, 
+.doc-upload-container h3 {
+    margin-bottom: 0.5rem;
+    color: var(--primary-color);
+    font-weight: 600;
+    text-align: center;
 }
 
 input[type="file"] {
@@ -121,22 +146,243 @@ input[type="file"] {
     border-radius: 4px;
     cursor: pointer;
     transition: background-color 0.2s;
+    text-align: center;
+    min-width: 180px;
 }
 
 .file-label:hover {
     background-color: var(--secondary-color);
 }
 
-#file-name {
+#file-name, #doc-name {
     margin-top: 0.5rem;
     color: #666;
     font-size: 0.9rem;
 }
 
-.sample-data {
-    border-top: 1px solid var(--border-color);
+.upload-actions {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 2rem;
+}
+
+.primary-button {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 0.8rem 2.5rem;
+    font-size: 1.1rem;
+    font-weight: 500;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.primary-button:hover:not(:disabled) {
+    background-color: var(--secondary-color);
+}
+
+.primary-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.bottom-actions {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 2rem;
     padding-top: 1rem;
+    border-top: 1px solid var(--border-color);
+}
+
+.secondary-button {
+    background-color: #f0f0f0;
+    color: var(--text-color);
+    padding: 0.5rem 1rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    font-size: 0.9rem;
+}
+
+.secondary-button:hover {
+    background-color: #e0e0e0;
+}
+
+.sample-data {
     text-align: center;
+}
+
+.doc-upload-container {
+    padding: 1.5rem;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+}
+
+.doc-status {
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+}
+
+.doc-status.success {
+    color: var(--success-color);
+}
+
+.doc-status.error {
+    color: var(--danger-color);
+}
+
+/* Help Modal */
+.help-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.help-modal.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.help-modal-content {
+    background-color: white;
+    border-radius: 8px;
+    max-width: 700px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.help-modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    background-color: white;
+    border-radius: 8px 8px 0 0;
+    z-index: 10;
+}
+
+.help-modal-header h3 {
+    margin: 0;
+    color: var(--primary-color);
+}
+
+.modal-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    font-size: 1.5rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #777;
+    padding: 0.25rem;
+    line-height: 1;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.modal-close:hover {
+    background-color: #f0f0f0;
+    color: var(--danger-color);
+}
+
+.help-modal-body {
+    padding: 1.5rem;
+}
+
+.help-modal-body h4 {
+    color: var(--primary-color);
+    margin: 1.5rem 0 0.5rem 0;
+}
+
+.help-modal-body h4:first-child {
+    margin-top: 0;
+}
+
+.help-modal-body p {
+    margin-bottom: 1rem;
+    line-height: 1.6;
+}
+
+.help-modal-body ul {
+    margin-left: 1.5rem;
+    margin-bottom: 1rem;
+}
+
+.help-modal-body li {
+    margin-bottom: 0.5rem;
+}
+
+.doc-sections-container {
+    width: 100%;
+    margin-top: 1rem;
+    padding: 1rem;
+    background-color: #f5f5f5;
+    border-radius: 4px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.doc-sections-container h4 {
+    margin-bottom: 0.5rem;
+    color: var(--primary-color);
+}
+
+.doc-sections-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.doc-section-item {
+    padding: 0.5rem;
+    border-left: 3px solid var(--primary-color);
+    background-color: white;
+}
+
+.section-level-1 {
+    font-weight: bold;
+    margin-left: 0;
+}
+
+.section-level-2 {
+    font-weight: 500;
+    margin-left: 1rem;
+}
+
+.section-level-3 {
+    font-weight: normal;
+    margin-left: 2rem;
+}
+
+.section-level-4 {
+    font-style: italic;
+    margin-left: 3rem;
 }
 
 /* Visualization Container */
@@ -199,6 +445,16 @@ input[type="file"] {
 
 .timeline-btn:hover {
     background-color: #e0e0e0;
+}
+
+.home-btn {
+    margin-left: 1rem;
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.home-btn:hover {
+    background-color: var(--secondary-color);
 }
 
 .view-pane {
@@ -338,6 +594,29 @@ input[type="file"] {
     margin-top: 0.5rem;
 }
 
+.sections-btn {
+    padding: 0.6rem 1.2rem;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    margin-top: 1rem;
+    width: 100%;
+    transition: background-color 0.2s;
+}
+
+.sections-btn:hover {
+    background-color: var(--secondary-color);
+}
+
+.details-sections {
+    margin-top: 1.5rem;
+    border-top: 1px solid var(--border-color);
+    padding-top: 1.5rem;
+}
+
 /* Timeline Entry Styles */
 .timeline-entry {
     padding: 0.8rem;
@@ -420,8 +699,8 @@ input[type="file"] {
 
 .timeline-buttons-container {
     display: flex;
-    gap: 0.5rem;
     margin-left: auto;
+    /* Remove gap and rely on consistent margins in buttons instead */
 }
 
 .details-button {
@@ -433,6 +712,7 @@ input[type="file"] {
     font-size: 0.8rem;
     cursor: pointer;
     transition: background-color 0.2s;
+    margin-left: 8px; /* Add consistent margin */
 }
 
 .details-button:hover {
@@ -450,6 +730,7 @@ input[type="file"] {
     transition: background-color 0.2s;
     text-decoration: none;
     display: inline-block;
+    margin-left: 0; /* Ensure no margin for first button */
 }
 
 .visit-button:hover {
@@ -486,6 +767,162 @@ input[type="file"] {
 }
 
 
+/* Document Sections Modal */
+.sections-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.sections-modal.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.sections-modal-content {
+    background-color: white;
+    border-radius: 8px;
+    max-width: 800px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    position: relative;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.sections-modal-header {
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    background-color: white;
+    border-radius: 8px 8px 0 0;
+    z-index: 10;
+}
+
+.sections-modal-header h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.3rem;
+    padding-right: 30px;
+}
+
+.sections-modal-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    font-size: 1.5rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #777;
+    padding: 0.25rem;
+    line-height: 1;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.sections-modal-close:hover {
+    background-color: #f0f0f0;
+    color: var(--danger-color);
+}
+
+.sections-modal-body {
+    padding: 1.5rem;
+}
+
+.section-item {
+    margin-bottom: 2rem;
+    padding: 1rem;
+    border-radius: 6px;
+    background-color: #f5f5f5;
+}
+
+.section-item:last-child {
+    margin-bottom: 0;
+}
+
+.section-header {
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    font-size: 1.1rem;
+    color: var(--primary-color);
+}
+
+.section-content {
+    white-space: pre-line;
+    line-height: 1.6;
+}
+
+.sections-modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid var(--border-color);
+    text-align: center;
+}
+
+.sections-back-btn {
+    padding: 0.6rem 1.2rem;
+    background-color: #f0f0f0;
+    color: var(--text-color);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: background-color 0.2s;
+}
+
+.sections-back-btn:hover {
+    background-color: #e0e0e0;
+}
+
+.view-cards-btn, .view-sections-btn {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.8rem;
+    background-color: var(--highlight-color);
+    color: var(--text-color);
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-left: 8px;
+    transition: all 0.2s;
+    font-weight: 500;
+}
+
+.view-cards-btn:hover:not(:disabled), .view-sections-btn:hover:not(:disabled) {
+    background-color: #e0b30e;
+}
+
+.view-cards-btn:disabled {
+    background-color: #f0f0f0;
+    color: #999;
+    cursor: default;
+}
+
+.no-doc-message {
+    font-style: italic;
+    color: #777;
+    margin-left: 8px;
+    font-size: 0.8rem;
+}
+
+.section-match-highlight {
+    background-color: #fffde7;
+    font-weight: 500;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .controls {
@@ -498,5 +935,11 @@ input[type="file"] {
         right: 0;
         top: 6.5rem;
         max-height: calc(100% - 6.5rem);
+    }
+    
+    .sections-modal-content {
+        width: 95%;
+        height: 95vh;
+        max-height: 95vh;
     }
 }
