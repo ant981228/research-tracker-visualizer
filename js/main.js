@@ -9,7 +9,9 @@ document.addEventListener('DOMContentLoaded', () => {
         data: null,
         detailsOpen: false,
         expandedSearches: new Set(), // Track which searches are expanded
-        docLoaded: false
+        docLoaded: false,
+        teacherNotes: new Map(), // Map of page URLs to teacher notes
+        currentEditingPage: null // Track which page is being edited
     };
 
     // DOM Elements
@@ -25,6 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
         timelineSettings: {
             expandAllBtn: document.getElementById('expand-all-btn'),
             collapseAllBtn: document.getElementById('collapse-all-btn'),
+            exportNotesBtn: document.getElementById('export-notes-btn'),
             goHomeBtn: document.getElementById('go-home-btn')
         },
         detailsPanel: document.getElementById('details-panel'),
@@ -43,7 +46,17 @@ document.addEventListener('DOMContentLoaded', () => {
         sectionsBackBtn: document.getElementById('sections-back-btn'),
         helpBtn: document.getElementById('help-btn'),
         helpModal: document.getElementById('help-modal'),
-        helpModalClose: document.getElementById('help-modal-close')
+        helpModalClose: document.getElementById('help-modal-close'),
+        editModal: document.getElementById('edit-modal'),
+        editModalClose: document.getElementById('edit-modal-close'),
+        editForm: document.getElementById('edit-form'),
+        editSaveBtn: document.getElementById('edit-save-btn'),
+        editCancelBtn: document.getElementById('edit-cancel-btn'),
+        addNoteModal: document.getElementById('add-note-modal'),
+        addNoteModalClose: document.getElementById('add-note-modal-close'),
+        addNoteForm: document.getElementById('add-note-form'),
+        noteSaveBtn: document.getElementById('note-save-btn'),
+        noteCancelBtn: document.getElementById('note-cancel-btn')
     };
 
     // Initialize components
@@ -77,6 +90,11 @@ document.addEventListener('DOMContentLoaded', () => {
             elements.timelineSettings.collapseAllBtn.addEventListener('click', collapseAllSearches);
         }
         
+        // Export Notes button
+        if (elements.timelineSettings.exportNotesBtn) {
+            elements.timelineSettings.exportNotesBtn.addEventListener('click', exportNotes);
+        }
+        
         // Go Home button
         if (elements.timelineSettings.goHomeBtn) {
             elements.timelineSettings.goHomeBtn.addEventListener('click', goHome);
@@ -105,6 +123,28 @@ document.addEventListener('DOMContentLoaded', () => {
         // Help modal close button
         if (elements.helpModalClose) {
             elements.helpModalClose.addEventListener('click', closeHelpModal);
+        }
+        
+        // Edit modal event listeners
+        if (elements.editModalClose) {
+            elements.editModalClose.addEventListener('click', closeEditModal);
+        }
+        if (elements.editSaveBtn) {
+            elements.editSaveBtn.addEventListener('click', saveMetadataChanges);
+        }
+        if (elements.editCancelBtn) {
+            elements.editCancelBtn.addEventListener('click', closeEditModal);
+        }
+        
+        // Add note modal event listeners
+        if (elements.addNoteModalClose) {
+            elements.addNoteModalClose.addEventListener('click', closeAddNoteModal);
+        }
+        if (elements.noteSaveBtn) {
+            elements.noteSaveBtn.addEventListener('click', saveTeacherNote);
+        }
+        if (elements.noteCancelBtn) {
+            elements.noteCancelBtn.addEventListener('click', closeAddNoteModal);
         }
     }
     
@@ -142,6 +182,16 @@ document.addEventListener('DOMContentLoaded', () => {
             // Close help modal if open
             if (elements.helpModal.classList.contains('active')) {
                 closeHelpModal();
+            }
+            
+            // Close edit modal if open
+            if (elements.editModal.classList.contains('active')) {
+                closeEditModal();
+            }
+            
+            // Close add note modal if open
+            if (elements.addNoteModal.classList.contains('active')) {
+                closeAddNoteModal();
             }
         }
     }
@@ -807,9 +857,19 @@ document.addEventListener('DOMContentLoaded', () => {
         
         console.log("Updating content pages with sections...");
         
+        // Get all page entries in the timeline
         const pageEntries = document.querySelectorAll('.timeline-entry.pageVisit');
         console.log(`Found ${pageEntries.length} page entries`);
         
+        // Get content pages from timeline data
+        const contentPages = state.data.timeline.filter(event => 
+            event.type === 'pageVisit'
+        );
+        
+        // Use the docProcessor to assign sections to their best matching content pages
+        const pageToSectionsMap = docProcessor.assignSectionsToBestPages(contentPages);
+        
+        // Update each page entry in the UI
         pageEntries.forEach(entry => {
             const url = entry.getAttribute('data-url');
             const title = entry.querySelector('h4')?.textContent;
@@ -819,19 +879,18 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log(`Processing page: ${title || url}`);
             
             // Find matching page data
-            const pageData = state.data.timeline.find(event => {
-                return event.type === 'pageVisit' && 
-                      (event.url === url || event.title === title);
-            });
+            const pageData = contentPages.find(page => 
+                (page.url === url || page.title === title)
+            );
             
             if (!pageData) {
                 console.log("No matching page data found");
                 return;
             }
             
-            // Find matching sections
-            const matchingSections = docProcessor.findMatchingSections(pageData);
-            console.log(`Found ${matchingSections.length} matching sections for: ${title || url}`);
+            // Get sections exclusively assigned to this page
+            const matchingSections = pageToSectionsMap.get(pageData) || [];
+            console.log(`Found ${matchingSections.length} exclusively matching sections for: ${title || url}`);
             
             // Find the cards button
             const cardsButton = entry.querySelector('.view-cards-btn');
@@ -841,7 +900,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             if (matchingSections.length > 0) {
-                console.log(`Enabling cards button with ${matchingSections.length} cards`);
+                console.log(`Enabling cards button with ${matchingSections.length} exclusive cards`);
                 // Update button text and enable it
                 cardsButton.textContent = `View ${matchingSections.length} Card${matchingSections.length !== 1 ? 's' : ''}`;
                 cardsButton.disabled = false;
@@ -852,7 +911,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Add click handler to the new button
                 newCardsButton.addEventListener('click', () => {
-                    console.log("Cards button clicked, showing sections");
+                    console.log("Cards button clicked, showing exclusive sections");
                     showSections(pageData, matchingSections);
                 });
                 
@@ -873,7 +932,7 @@ document.addEventListener('DOMContentLoaded', () => {
     /**
      * Show sections modal for a page
      * @param {Object} page - Page data
-     * @param {Array} sections - Matching sections
+     * @param {Array} sections - Matching sections with scores
      */
     function showSections(page, sections) {
         if (!page || !sections || sections.length === 0) return;
@@ -886,13 +945,20 @@ document.addEventListener('DOMContentLoaded', () => {
         elements.sectionsModalBody.innerHTML = '';
         
         // Add each section
-        sections.forEach(section => {
+        sections.forEach((section, index) => {
             const sectionElement = document.createElement('div');
             sectionElement.className = 'section-item';
             
             const sectionHeader = document.createElement('div');
             sectionHeader.className = 'section-header';
-            sectionHeader.textContent = section.title;
+            
+            // Show match score if available
+            let headerContent = section.title;
+            if (section.matchScore !== undefined) {
+                headerContent += ` <span class="match-score">(Match score: ${section.matchScore})</span>`;
+            }
+            
+            sectionHeader.innerHTML = headerContent;
             
             const sectionContent = document.createElement('div');
             sectionContent.className = 'section-content';
@@ -909,22 +975,97 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Highlight URL matches (if present in text)
             if (page.url) {
-                // Extract domain for simpler matching
-                const urlParts = page.url.split('/');
-                const domain = urlParts[2]; // e.g., "www.example.com"
-                
-                if (domain) {
-                    const domainRegex = new RegExp(escapeRegExp(domain), 'gi');
-                    highlightedContent = highlightedContent.replace(domainRegex,
-                        match => `<span class="section-match-highlight">${match}</span>`);
+                try {
+                    // Use proper URL parsing
+                    const url = new URL(page.url);
+                    const domain = url.hostname;
+                    
+                    // Highlight domain
+                    if (domain) {
+                        const domainRegex = new RegExp(escapeRegExp(domain), 'gi');
+                        highlightedContent = highlightedContent.replace(domainRegex,
+                            match => `<span class="section-match-highlight">${match}</span>`);
+                    }
+                    
+                    // Highlight path segments
+                    const pathSegments = url.pathname.split('/')
+                        .filter(segment => segment.length > 0);
+                        
+                    for (const segment of pathSegments) {
+                        if (segment.length > 3) { // Only highlight significant segments
+                            const segmentRegex = new RegExp(escapeRegExp(segment), 'gi');
+                            highlightedContent = highlightedContent.replace(segmentRegex,
+                                match => `<span class="section-match-highlight url-segment">${match}</span>`);
+                        }
+                    }
+                } catch (e) {
+                    // Fallback to simpler domain extraction
+                    const urlParts = page.url.split('/');
+                    const domain = urlParts[2]; // e.g., "www.example.com"
+                    
+                    if (domain) {
+                        const domainRegex = new RegExp(escapeRegExp(domain), 'gi');
+                        highlightedContent = highlightedContent.replace(domainRegex,
+                            match => `<span class="section-match-highlight">${match}</span>`);
+                    }
                 }
             }
             
+            // Add match details if available
+            if (section.matchDetails) {
+                const matchDetailsDiv = document.createElement('div');
+                matchDetailsDiv.className = 'match-details';
+                
+                let matchDetailsHTML = '<h4>Match Details:</h4><ul>';
+                
+                if (section.matchDetails.exactTitleMatch) {
+                    matchDetailsHTML += '<li>Exact title match</li>';
+                }
+                
+                if (section.matchDetails.cleanTitleMatch) {
+                    matchDetailsHTML += '<li>Clean title match</li>';
+                }
+                
+                if (section.matchDetails.titleWordMatch) {
+                    const wordMatch = section.matchDetails.titleWordMatch;
+                    matchDetailsHTML += `<li>Title word match: ${wordMatch.matched}/${wordMatch.total} words (${Math.round(wordMatch.ratio * 100)}%)</li>`;
+                }
+                
+                if (section.matchDetails.fullUrlMatch) {
+                    matchDetailsHTML += '<li>Full URL match</li>';
+                }
+                
+                if (section.matchDetails.urlComponentMatch) {
+                    const urlMatch = section.matchDetails.urlComponentMatch;
+                    matchDetailsHTML += `<li>URL component match: "${urlMatch.component}"${urlMatch.isDomainOnly ? ' (domain only)' : ''}</li>`;
+                }
+                
+                if (section.matchDetails.authorMatch) {
+                    matchDetailsHTML += '<li>Author match</li>';
+                }
+                
+                if (section.matchDetails.descriptionMatch) {
+                    const descMatch = section.matchDetails.descriptionMatch;
+                    matchDetailsHTML += `<li>Description match: ${descMatch.matched} key terms</li>`;
+                }
+                
+                if (section.matchDetails.dateMatch) {
+                    matchDetailsHTML += '<li>Publication date match</li>';
+                }
+                
+                matchDetailsHTML += '</ul>';
+                matchDetailsDiv.innerHTML = matchDetailsHTML;
+                
+                // Add the match details before the content
+                sectionElement.appendChild(sectionHeader);
+                sectionElement.appendChild(matchDetailsDiv);
+                sectionElement.appendChild(sectionContent);
+            } else {
+                sectionElement.appendChild(sectionHeader);
+                sectionElement.appendChild(sectionContent);
+            }
+            
             sectionContent.innerHTML = highlightedContent;
-            
-            sectionElement.appendChild(sectionHeader);
-            sectionElement.appendChild(sectionContent);
-            
             elements.sectionsModalBody.appendChild(sectionElement);
         });
         
@@ -984,13 +1125,17 @@ document.addEventListener('DOMContentLoaded', () => {
         else if (node.type === 'page') {
             const metadata = node.metadata || {};
             
+            // Prioritize metadata.title (more accurate) over node.title, show URL separately if we have a title
+            const displayTitle = metadata.title || node.title;
+            const displayUrl = node.url;
+            
             content = `
                 <div class="details-header">
                     <h4>Page Visit</h4>
                     <div class="details-type page">Web Page</div>
                 </div>
                 <div class="details-body">
-                    <div class="details-title">${node.title || 'Untitled'}</div>
+                    <div class="details-title">${displayTitle || displayUrl}</div>
                     <div class="details-timestamp">
                         <strong>Visited:</strong> ${formatDate(node.timestamp)}
                     </div>
@@ -1000,28 +1145,43 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
             
-            // Add metadata if available
-            if (metadata) {
-                content += '<div class="details-metadata">';
+            // Add comprehensive metadata section if available
+            if (metadata && Object.keys(metadata).length > 0) {
+                content += '<div class="details-metadata"><h4>Metadata</h4>';
                 
                 if (metadata.author) {
-                    content += `<div><strong>Author:</strong> ${metadata.author}</div>`;
+                    content += `<div class="details-metadata-item"><strong>Author:</strong> ${metadata.author}</div>`;
+                }
+                
+                if (metadata.publisher) {
+                    content += `<div class="details-metadata-item"><strong>Publisher:</strong> ${metadata.publisher}</div>`;
                 }
                 
                 if (metadata.publishDate) {
-                    content += `<div><strong>Published:</strong> ${metadata.publishDate}</div>`;
+                    content += `<div class="details-metadata-item"><strong>Published:</strong> ${metadata.publishDate}</div>`;
                 }
                 
                 if (metadata.description) {
-                    content += `<div class="details-description">${metadata.description}</div>`;
+                    content += `<div class="details-metadata-item details-description"><strong>Description:</strong> ${metadata.description}</div>`;
                 }
+                
+                // Add any other metadata fields that might be present
+                Object.keys(metadata).forEach(key => {
+                    if (!['title', 'url', 'author', 'publisher', 'publishDate', 'description'].includes(key)) {
+                        const value = metadata[key];
+                        if (value && typeof value === 'string') {
+                            const capitalizedKey = key.charAt(0).toUpperCase() + key.slice(1);
+                            content += `<div class="details-metadata-item"><strong>${capitalizedKey}:</strong> ${value}</div>`;
+                        }
+                    }
+                });
                 
                 content += '</div>';
             }
             
             // Add notes if available
             if (node.notes && node.notes.length > 0) {
-                content += '<div class="details-notes"><h4>Notes</h4>';
+                content += '<div class="details-notes"><h4>Student Notes</h4>';
                 
                 node.notes.forEach(note => {
                     content += `
@@ -1035,15 +1195,66 @@ document.addEventListener('DOMContentLoaded', () => {
                 content += '</div>';
             }
             
+            // Add teacher notes if available
+            const teacherNotes = state.teacherNotes.get(node.url) || [];
+            if (teacherNotes.length > 0) {
+                content += '<div class="details-notes teacher-notes"><h4>Teacher Notes</h4>';
+                
+                teacherNotes.forEach(note => {
+                    content += `
+                        <div class="details-note teacher-note">
+                            <div class="note-content">${note.content}</div>
+                            <div class="note-timestamp">${formatDate(note.timestamp)}</div>
+                        </div>
+                    `;
+                });
+                
+                content += '</div>';
+            }
+            
+            // Add teacher action buttons
+            content += `
+                <div class="teacher-actions">
+                    <button class="edit-metadata-btn" data-page-url="${node.url}">Edit Metadata</button>
+                    <button class="add-note-btn" data-page-url="${node.url}">Add Teacher Note</button>
+                </div>
+            `;
+            
             // Add document sections button at the bottom if document is loaded
             if (state.docLoaded) {
-                const matchingSections = docProcessor.findMatchingSections(node);
+                // Find the exact matching content page from the timeline data
+                const exactPage = state.data.timeline.find(event => 
+                    event.type === 'pageVisit' && 
+                    (event.url === node.url || event.title === node.title)
+                );
                 
-                if (matchingSections.length > 0) {
+                if (exactPage) {
+                    // Get all content pages from timeline data
+                    const contentPages = state.data.timeline.filter(event => 
+                        event.type === 'pageVisit'
+                    );
+                    
+                    // Get all page-to-sections assignments (for exclusive matches)
+                    const pageToSectionsMap = docProcessor.assignSectionsToBestPages(contentPages);
+                    
+                    // Get sections exclusively assigned to this page
+                    const exclusiveSections = pageToSectionsMap.get(exactPage) || [];
+                    
+                    // Always show the button in details view, but disable it if there are no sections
                     content += `
                         <div class="details-sections">
-                            <button class="sections-btn" id="details-sections-btn" data-page-url="${node.url}">
-                                View ${matchingSections.length} Card${matchingSections.length !== 1 ? 's' : ''}
+                            <button class="sections-btn" id="details-sections-btn" data-page-url="${node.url}" 
+                                ${exclusiveSections.length === 0 ? 'disabled' : ''}>
+                                View ${exclusiveSections.length} Card${exclusiveSections.length !== 1 ? 's' : ''}
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    // Fallback if no exact page is found (should not happen)
+                    content += `
+                        <div class="details-sections">
+                            <button class="sections-btn" id="details-sections-btn" disabled>
+                                View 0 Cards
                             </button>
                         </div>
                     `;
@@ -1080,14 +1291,50 @@ document.addEventListener('DOMContentLoaded', () => {
         const sectionsBtn = document.getElementById('details-sections-btn');
         if (sectionsBtn) {
             sectionsBtn.addEventListener('click', () => {
-                const pageUrl = sectionsBtn.getAttribute('data-page-url');
-                const matchingSections = docProcessor.findMatchingSections(node);
+                // Don't do anything if button is disabled (no sections)
+                if (sectionsBtn.disabled) return;
                 
-                if (matchingSections.length > 0) {
-                    showSections(node, matchingSections);
+                const pageUrl = sectionsBtn.getAttribute('data-page-url');
+                
+                // Find the exact matching content page from the timeline data
+                const exactPage = state.data.timeline.find(event => 
+                    event.type === 'pageVisit' && 
+                    (event.url === node.url || event.title === node.title)
+                );
+                
+                if (exactPage) {
+                    // Get all content pages from timeline data
+                    const contentPages = state.data.timeline.filter(event => 
+                        event.type === 'pageVisit'
+                    );
+                    
+                    // Get all page-to-sections assignments
+                    const pageToSectionsMap = docProcessor.assignSectionsToBestPages(contentPages);
+                    
+                    // Get sections exclusively assigned to this page
+                    const exclusiveSections = pageToSectionsMap.get(exactPage) || [];
+                    
+                    if (exclusiveSections.length > 0) {
+                        showSections(exactPage, exclusiveSections);
+                    }
                 }
             });
         }
+
+        // Add event listeners for teacher action buttons
+        document.querySelectorAll('.edit-metadata-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const pageUrl = this.getAttribute('data-page-url');
+                showEditModal(pageUrl);
+            });
+        });
+
+        document.querySelectorAll('.add-note-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const pageUrl = this.getAttribute('data-page-url');
+                showAddNoteModal(pageUrl);
+            });
+        });
         
         // Show the details panel
         elements.detailsPanel.classList.add('open');
@@ -1196,6 +1443,315 @@ document.addEventListener('DOMContentLoaded', () => {
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
 
+    /**
+     * Show the edit metadata modal for a page
+     * @param {string} pageUrl - URL of the page to edit
+     */
+    function showEditModal(pageUrl) {
+        // Find the page data from timeline
+        const pageData = state.data.timeline.find(event => 
+            event.type === 'pageVisit' && event.url === pageUrl
+        );
+        
+        if (!pageData) {
+            showError('Page data not found');
+            return;
+        }
+        
+        // Store the page being edited
+        state.currentEditingPage = pageData;
+        
+        // Pre-populate the form with existing metadata
+        const metadata = pageData.metadata || {};
+        
+        const titleField = document.getElementById('edit-title');
+        const authorField = document.getElementById('edit-author');
+        const publisherField = document.getElementById('edit-publisher');
+        const publishDateField = document.getElementById('edit-publish-date');
+        const descriptionField = document.getElementById('edit-description');
+        
+        if (titleField) titleField.value = metadata.title || pageData.title || '';
+        if (authorField) authorField.value = metadata.author || '';
+        if (publisherField) publisherField.value = metadata.publisher || '';
+        if (publishDateField) publishDateField.value = metadata.publishDate || '';
+        if (descriptionField) descriptionField.value = metadata.description || '';
+        
+        // Show the modal
+        elements.editModal.classList.add('active');
+    }
+
+    /**
+     * Close the edit metadata modal
+     */
+    function closeEditModal() {
+        elements.editModal.classList.remove('active');
+        state.currentEditingPage = null;
+    }
+
+    /**
+     * Save metadata changes
+     */
+    function saveMetadataChanges() {
+        if (!state.currentEditingPage) {
+            showError('No page selected for editing');
+            return;
+        }
+        
+        // Get form values
+        const titleField = document.getElementById('edit-title');
+        const authorField = document.getElementById('edit-author');
+        const publisherField = document.getElementById('edit-publisher');
+        const publishDateField = document.getElementById('edit-publish-date');
+        const descriptionField = document.getElementById('edit-description');
+        
+        // Update the page metadata
+        if (!state.currentEditingPage.metadata) {
+            state.currentEditingPage.metadata = {};
+        }
+        
+        const metadata = state.currentEditingPage.metadata;
+        
+        // Update metadata fields
+        if (titleField) metadata.title = titleField.value.trim();
+        if (authorField) metadata.author = authorField.value.trim();
+        if (publisherField) metadata.publisher = publisherField.value.trim();
+        if (publishDateField) metadata.publishDate = publishDateField.value.trim();
+        if (descriptionField) metadata.description = descriptionField.value.trim();
+        
+        // Update URL in metadata (this is read-only but keep it consistent)
+        metadata.url = state.currentEditingPage.url;
+        
+        // Close the modal
+        closeEditModal();
+        
+        // Refresh the details panel if it's showing this page
+        if (state.detailsOpen) {
+            // Check if the details panel is showing the page we just edited
+            const detailsTitle = elements.detailsContent.querySelector('.details-title');
+            if (detailsTitle && state.currentEditingPage.url) {
+                // Refresh the details view
+                showNodeDetails({
+                    type: 'page',
+                    url: state.currentEditingPage.url,
+                    title: state.currentEditingPage.title,
+                    timestamp: state.currentEditingPage.timestamp,
+                    metadata: state.currentEditingPage.metadata,
+                    notes: state.currentEditingPage.notes
+                });
+            }
+        }
+        
+        // Refresh the timeline view to show updated metadata
+        if (state.data && state.data.timeline) {
+            timelineView.update(state.data.timeline);
+            timelineView.updateExpandedSearches(state.expandedSearches);
+        }
+    }
+
+    /**
+     * Show the add teacher note modal for a page
+     * @param {string} pageUrl - URL of the page to add note to
+     */
+    function showAddNoteModal(pageUrl) {
+        // Store the page URL for the note
+        state.currentEditingPage = { url: pageUrl };
+        
+        // Clear the textarea
+        const noteContentField = document.getElementById('note-content');
+        if (noteContentField) {
+            noteContentField.value = '';
+        }
+        
+        // Show the modal
+        elements.addNoteModal.classList.add('active');
+    }
+
+    /**
+     * Close the add note modal
+     */
+    function closeAddNoteModal() {
+        elements.addNoteModal.classList.remove('active');
+        state.currentEditingPage = null;
+    }
+
+    /**
+     * Save teacher note
+     */
+    function saveTeacherNote() {
+        if (!state.currentEditingPage || !state.currentEditingPage.url) {
+            showError('No page selected for note');
+            return;
+        }
+        
+        const noteContentField = document.getElementById('note-content');
+        if (!noteContentField) {
+            showError('Note content field not found');
+            return;
+        }
+        
+        const noteContent = noteContentField.value.trim();
+        if (!noteContent) {
+            showError('Please enter a note');
+            return;
+        }
+        
+        const pageUrl = state.currentEditingPage.url;
+        
+        // Get or create teacher notes array for this page
+        if (!state.teacherNotes.has(pageUrl)) {
+            state.teacherNotes.set(pageUrl, []);
+        }
+        
+        const teacherNotes = state.teacherNotes.get(pageUrl);
+        
+        // Add the new note with timestamp
+        teacherNotes.push({
+            content: noteContent,
+            timestamp: new Date().toISOString()
+        });
+        
+        // Close the modal
+        closeAddNoteModal();
+        
+        // Refresh the details panel if it's showing this page
+        if (state.detailsOpen) {
+            const pageData = state.data.timeline.find(event => 
+                event.type === 'pageVisit' && event.url === pageUrl
+            );
+            
+            if (pageData) {
+                showNodeDetails({
+                    type: 'page',
+                    url: pageData.url,
+                    title: pageData.title,
+                    timestamp: pageData.timestamp,
+                    metadata: pageData.metadata,
+                    notes: pageData.notes
+                });
+            }
+        }
+    }
+
+    /**
+     * Export all teacher notes as TXT
+     */
+    function exportNotes() {
+        if (state.teacherNotes.size === 0) {
+            showError('No teacher notes to export');
+            return;
+        }
+        
+        // Create text content
+        let textContent = '';
+        textContent += `TEACHER NOTES EXPORT\n`;
+        textContent += `=====================\n\n`;
+        textContent += `Session: ${state.data.raw.name || 'Research Session'}\n`;
+        textContent += `Session ID: ${state.data.raw.id}\n`;
+        textContent += `Session Start: ${formatDate(state.data.raw.startTime)}\n`;
+        textContent += `Session End: ${formatDate(state.data.raw.endTime)}\n`;
+        textContent += `Export Date: ${formatDate(new Date().toISOString())}\n`;
+        textContent += `\n${'='.repeat(60)}\n\n`;
+        
+        // Add notes for each page
+        for (const [pageUrl, notes] of state.teacherNotes) {
+            // Find the page data to include title and metadata
+            const pageData = state.data.timeline.find(event => 
+                event.type === 'pageVisit' && event.url === pageUrl
+            );
+            
+            const pageTitle = pageData ? (pageData.metadata?.title || pageData.title) : 'Unknown Page';
+            
+            textContent += `PAGE: ${pageTitle}\n`;
+            textContent += `URL: ${pageUrl}\n`;
+            textContent += `${'-'.repeat(40)}\n`;
+            
+            notes.forEach((note, index) => {
+                textContent += `Note ${index + 1} (${formatDate(note.timestamp)}):\n`;
+                textContent += `${note.content}\n\n`;
+            });
+            
+            textContent += `${'='.repeat(60)}\n\n`;
+        }
+        
+        // Create and download the file
+        const dataBlob = new Blob([textContent], { type: 'text/plain' });
+        
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(dataBlob);
+        link.download = `teacher-notes-${state.data.raw.id || 'session'}-${new Date().toISOString().split('T')[0]}.txt`;
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Clean up the object URL
+        URL.revokeObjectURL(link.href);
+    }
+
+    /**
+     * Remove a content page from the timeline
+     * @param {string} pageUrl - URL of the page to remove
+     */
+    function removeContentPage(pageUrl) {
+        if (!pageUrl || !state.data || !state.data.timeline) {
+            return;
+        }
+        
+        // Find and remove the page from timeline data
+        const pageIndex = state.data.timeline.findIndex(event => 
+            event.type === 'pageVisit' && event.url === pageUrl
+        );
+        
+        if (pageIndex !== -1) {
+            // Remove from timeline data
+            state.data.timeline.splice(pageIndex, 1);
+            
+            // Also remove from chronological events if it exists there
+            if (state.data.raw && state.data.raw.chronologicalEvents) {
+                const chronoIndex = state.data.raw.chronologicalEvents.findIndex(event => 
+                    event.type === 'pageVisit' && event.url === pageUrl
+                );
+                if (chronoIndex !== -1) {
+                    state.data.raw.chronologicalEvents.splice(chronoIndex, 1);
+                }
+            }
+            
+            // Also remove from contentPages array if it exists
+            if (state.data.raw && state.data.raw.contentPages) {
+                const contentIndex = state.data.raw.contentPages.findIndex(page => 
+                    page.url === pageUrl
+                );
+                if (contentIndex !== -1) {
+                    state.data.raw.contentPages.splice(contentIndex, 1);
+                }
+            }
+            
+            // Remove any teacher notes for this page
+            if (state.teacherNotes.has(pageUrl)) {
+                state.teacherNotes.delete(pageUrl);
+            }
+            
+            // Close details panel if it's showing the removed page
+            if (state.detailsOpen) {
+                const detailsTitle = elements.detailsContent.querySelector('.details-title');
+                if (detailsTitle) {
+                    closeDetails();
+                }
+            }
+            
+            // Update the timeline view
+            timelineView.update(state.data.timeline);
+            timelineView.updateExpandedSearches(state.expandedSearches);
+            
+            // Update content pages with sections if document is loaded
+            if (state.docLoaded) {
+                setTimeout(() => {
+                    updateContentPagesWithSections();
+                }, 100);
+            }
+        }
+    }
+
     // Initialize application
     function init() {
         setupEventListeners();
@@ -1207,6 +1763,9 @@ document.addEventListener('DOMContentLoaded', () => {
             rawView.initialize();
         }, 100);
     }
+
+    // Expose functions globally for access from other components
+    window.showAddNoteModal = showAddNoteModal;
 
     // Start the application
     init();

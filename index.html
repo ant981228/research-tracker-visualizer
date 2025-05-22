@@ -99,6 +99,7 @@
                     <div class="timeline-buttons">
                         <button id="expand-all-btn" class="timeline-btn">Expand All</button>
                         <button id="collapse-all-btn" class="timeline-btn">Collapse All</button>
+                        <button id="export-notes-btn" class="timeline-btn">Export Notes</button>
                         <button id="go-home-btn" class="timeline-btn home-btn">Go Home</button>
                     </div>
                 </div>
@@ -141,6 +142,65 @@
                 </div>
                 <div class="sections-modal-footer">
                     <button id="sections-back-btn" class="sections-back-btn">Go Back</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Edit Metadata Modal -->
+        <div id="edit-modal" class="sections-modal">
+            <div class="sections-modal-content">
+                <div class="sections-modal-header">
+                    <h3>Edit Page Metadata</h3>
+                    <button id="edit-modal-close" class="sections-modal-close">×</button>
+                </div>
+                <div class="sections-modal-body">
+                    <form id="edit-form">
+                        <div class="form-group">
+                            <label for="edit-title">Title:</label>
+                            <input type="text" id="edit-title" name="title">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-author">Author:</label>
+                            <input type="text" id="edit-author" name="author">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-publisher">Publisher:</label>
+                            <input type="text" id="edit-publisher" name="publisher">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-publishDate">Publish Date:</label>
+                            <input type="text" id="edit-publishDate" name="publishDate">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-description">Description:</label>
+                            <textarea id="edit-description" name="description" rows="3"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="sections-modal-footer">
+                    <button id="edit-save-btn" class="primary-button">Save Changes</button>
+                    <button id="edit-cancel-btn" class="sections-back-btn">Cancel</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Add Note Modal -->
+        <div id="add-note-modal" class="sections-modal">
+            <div class="sections-modal-content">
+                <div class="sections-modal-header">
+                    <h3>Add Note</h3>
+                    <button id="add-note-modal-close" class="sections-modal-close">×</button>
+                </div>
+                <div class="sections-modal-body">
+                    <form id="add-note-form">
+                        <div class="form-group">
+                            <textarea id="note-content" name="content" rows="4" placeholder="Add your note here..." class="large-textarea"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="sections-modal-footer">
+                    <button id="note-save-btn" class="sections-back-btn">Add Note</button>
+                    <button id="note-cancel-btn" class="sections-back-btn">Cancel</button>
                 </div>
             </div>
         </div>

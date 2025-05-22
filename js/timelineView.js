@@ -261,9 +261,19 @@ class TimelineView {
         else if (event.type === 'pageVisit') {
             const metadata = event.metadata || {};
             
-            content.innerHTML = `
-                <h4>${event.title || metadata.title || 'Untitled Page'}</h4>
-            `;
+            // Prioritize metadata.title (more accurate) over event.title, fallback to URL
+            const displayTitle = metadata.title || event.title;
+            const displayUrl = event.url;
+            
+            if (displayTitle && displayTitle.trim()) {
+                content.innerHTML = `
+                    <h4>${displayTitle}</h4>
+                `;
+            } else {
+                content.innerHTML = `
+                    <h4>${displayUrl}</h4>
+                `;
+            }
             
             // Removed "From search" information as it's already visually indicated by the layout
             
@@ -334,6 +344,35 @@ class TimelineView {
             cardsButton.disabled = true;
             
             buttonContainer.appendChild(cardsButton);
+            
+            // Add note button for page visits
+            const addNoteButton = document.createElement('button');
+            addNoteButton.className = 'add-note-btn';
+            addNoteButton.textContent = 'Add Note';
+            addNoteButton.setAttribute('data-page-url', event.url);
+            addNoteButton.addEventListener('click', (e) => {
+                e.stopPropagation(); // Don't trigger any parent click handlers
+                
+                // Call the global showAddNoteModal function
+                if (typeof showAddNoteModal === 'function') {
+                    showAddNoteModal(event.url);
+                }
+            });
+            
+            buttonContainer.appendChild(addNoteButton);
+            
+            // Add remove button for page visits
+            const removeButton = document.createElement('button');
+            removeButton.className = 'remove-item-btn';
+            removeButton.textContent = 'Remove Item';
+            removeButton.addEventListener('click', (e) => {
+                e.stopPropagation(); // Don't trigger any parent click handlers
+                
+                // Remove the timeline entry from the DOM
+                entry.remove();
+            });
+            
+            buttonContainer.appendChild(removeButton);
         }
         
         entry.appendChild(buttonContainer);

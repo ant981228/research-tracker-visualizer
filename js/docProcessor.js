@@ -168,73 +168,286 @@ class DocProcessor {
     }
 
     /**
-     * Find sections that match a content page (by title or URL)
+     * Find the best matching section for a content page based on multiple criteria
      * @param {Object} page - The content page object
-     * @returns {Array} - Array of matching section objects
+     * @param {boolean} [respectExclusivity=false] - If true, respects exclusive section assignments
+     * @returns {Array} - Array of matching section objects with scores
      */
-    findMatchingSections(page) {
+    findMatchingSections(page, respectExclusivity = false) {
         if (!this.documentLoaded || !this.sections.length) {
             return [];
         }
         
         // Create normalized versions for matching
-        let pageTitle = (page.title || '').toLowerCase();
+        const pageTitle = (page.title || '').toLowerCase();
         const pageUrl = (page.url || '').toLowerCase();
+        const pageMeta = page.metadata || {};
         
-        // Extract domain from URL for better matching
+        // Extract metadata for matching
+        const metaAuthor = (pageMeta.author || '').toLowerCase();
+        const metaDescription = (pageMeta.description || '').toLowerCase();
+        const metaDate = (pageMeta.publishDate || '').toLowerCase();
+        
+        // Extract URL components for better matching
+        let urlComponents = [];
         let domain = '';
+        let pathSegments = [];
+        
         if (pageUrl) {
             try {
+                const url = new URL(pageUrl);
+                domain = url.hostname; // e.g., "www.example.com"
+                
+                // Get path segments (excluding empty segments)
+                pathSegments = url.pathname.split('/')
+                    .filter(segment => segment.length > 0);
+                
+                // Store full domain and all path segments for matching
+                urlComponents = [domain, ...pathSegments];
+                
+                console.log(`URL components for ${pageUrl}:`, urlComponents);
+            } catch (e) {
+                console.warn("Could not parse URL components:", pageUrl, e);
+                // If URL parsing fails, still try to extract domain conventionally
                 const urlParts = pageUrl.split('/');
                 if (urlParts.length > 2) {
                     domain = urlParts[2]; // e.g., "www.example.com"
+                    urlComponents = [domain];
                 }
-            } catch (e) {
-                console.warn("Could not extract domain from URL:", pageUrl);
             }
         }
         
-        // For titles, create a simpler version for matching (remove common words)
-        if (pageTitle) {
-            // Remove articles and common words for better matching
-            pageTitle = pageTitle.replace(/\b(the|a|an|and|or|but|in|on|at|to|for|with|by|of)\b/gi, ' ');
-            // Clean up multiple spaces
-            pageTitle = pageTitle.replace(/\s+/g, ' ').trim();
-        }
+        // For titles, create a clean version for matching (remove common words)
+        const cleanPageTitle = pageTitle
+            .replace(/\b(the|a|an|and|or|but|in|on|at|to|for|with|by|of)\b/gi, ' ')
+            .replace(/\s+/g, ' ').trim();
+            
+        // Get important words from the title (>3 chars, not common words)
+        const titleWords = cleanPageTitle.split(' ')
+            .filter(word => word.length > 3)
+            .map(word => word.toLowerCase());
+            
+        console.log(`Important title words for "${pageTitle}":`, titleWords);
         
-        // Find matching sections
-        const matchingSections = this.sections.filter(section => {
+        // Score all sections based on match quality
+        const scoredSections = this.sections.map(section => {
             const sectionContent = section.content.toLowerCase();
+            let score = 0;
+            const matchDetails = {};
             
-            // Check for exact title match
-            if (pageTitle && sectionContent.includes(pageTitle)) {
-                return true;
+            // Skip if this section has already been assigned to another page with higher score
+            // and we're respecting exclusivity
+            if (respectExclusivity && 
+                section.bestMatchPage && 
+                section.bestMatchPage.url !== page.url && 
+                section.bestMatchScore > 0) {
+                return {
+                    section,
+                    score: 0,
+                    matchDetails: {
+                        excludedDueToExclusivity: true,
+                        assignedToPage: section.bestMatchPage.title || section.bestMatchPage.url
+                    }
+                };
             }
             
-            // Check for URL/domain match
-            if ((pageUrl && sectionContent.includes(pageUrl)) || 
-                (domain && sectionContent.includes(domain))) {
-                return true;
-            }
-            
-            // For titles with multiple words, check if most of the important words are present
-            if (pageTitle && pageTitle.length > 10) {
-                const words = pageTitle.split(' ').filter(w => w.length > 3); // Only consider significant words
-                if (words.length > 1) {
-                    // Count how many significant words are present
-                    const matchCount = words.filter(word => sectionContent.includes(word)).length;
-                    // If more than 60% of the significant words match, consider it a match
-                    if (matchCount >= Math.ceil(words.length * 0.6)) {
-                        return true;
+            // 1. Title matching (highest priority)
+            if (pageTitle) {
+                // Exact title match (highest score)
+                if (sectionContent.includes(pageTitle)) {
+                    score += 100;
+                    matchDetails.exactTitleMatch = true;
+                } 
+                // Clean title match
+                else if (cleanPageTitle && sectionContent.includes(cleanPageTitle)) {
+                    score += 90;
+                    matchDetails.cleanTitleMatch = true;
+                }
+                // Partial title matching with important words
+                else if (titleWords.length > 0) {
+                    const matchedWords = titleWords.filter(word => sectionContent.includes(word));
+                    const wordMatchRatio = matchedWords.length / titleWords.length;
+                    
+                    if (wordMatchRatio > 0) {
+                        // Scale score up to 80 points based on % of words matched
+                        const titleWordScore = Math.floor(80 * wordMatchRatio);
+                        score += titleWordScore;
+                        matchDetails.titleWordMatch = {
+                            matched: matchedWords.length,
+                            total: titleWords.length,
+                            ratio: wordMatchRatio
+                        };
                     }
                 }
             }
             
-            return false;
+            // 2. URL matching (second priority, weighted by specificity)
+            if (pageUrl && urlComponents.length > 0) {
+                // Score based on the longest URL component found
+                let bestUrlMatch = '';
+                let bestUrlMatchLength = 0;
+                
+                // Check full URL exact match first
+                if (sectionContent.includes(pageUrl)) {
+                    score += 75;
+                    matchDetails.fullUrlMatch = true;
+                } else {
+                    // Check for URL component matches
+                    for (const component of urlComponents) {
+                        if (component.length > bestUrlMatchLength && sectionContent.includes(component)) {
+                            bestUrlMatch = component;
+                            bestUrlMatchLength = component.length;
+                        }
+                    }
+                    
+                    if (bestUrlMatchLength > 0) {
+                        // Domain-only matches get fewer points
+                        const isDomainOnlyMatch = bestUrlMatch === domain;
+                        const urlMatchScore = isDomainOnlyMatch ? 20 : 40;
+                        
+                        // Adjust score based on how specific the match is
+                        // (longer matches are more specific and get more points)
+                        const specificityBonus = Math.min(30, bestUrlMatch.length / 2);
+                        
+                        score += urlMatchScore + specificityBonus;
+                        matchDetails.urlComponentMatch = {
+                            component: bestUrlMatch,
+                            isDomainOnly: isDomainOnlyMatch
+                        };
+                    }
+                }
+            }
+            
+            // 3. Metadata matching (additional points)
+            if (metaAuthor && sectionContent.includes(metaAuthor)) {
+                score += 15;
+                matchDetails.authorMatch = true;
+            }
+            
+            if (metaDescription) {
+                const descWords = metaDescription.split(' ')
+                    .filter(word => word.length > 4);
+                    
+                const matchedDescWords = descWords.filter(word => sectionContent.includes(word));
+                if (matchedDescWords.length > 0) {
+                    const descMatchScore = Math.min(20, matchedDescWords.length * 2);
+                    score += descMatchScore;
+                    matchDetails.descriptionMatch = {
+                        matched: matchedDescWords.length,
+                        total: descWords.length
+                    };
+                }
+            }
+            
+            if (metaDate && sectionContent.includes(metaDate)) {
+                score += 10;
+                matchDetails.dateMatch = true;
+            }
+            
+            // Only consider sections with some level of matching
+            return {
+                section,
+                score,
+                matchDetails
+            };
+        }).filter(item => item.score > 0)
+          .sort((a, b) => b.score - a.score);
+        
+        // Group sections by similar content (to handle duplicates)
+        const uniqueSections = this._getUniqueBestSections(scoredSections);
+        
+        console.log(`Found ${uniqueSections.length} matching sections for page: ${page.title || page.url}`);
+        
+        // If we're not respecting exclusivity, update the best match info for each section
+        if (!respectExclusivity) {
+            uniqueSections.forEach(item => {
+                const section = item.section;
+                const score = item.score;
+                
+                // Only update if this is a better match than what was previously found
+                if (!section.bestMatchScore || score > section.bestMatchScore) {
+                    section.bestMatchScore = score;
+                    section.bestMatchPage = page;
+                }
+            });
+        }
+        
+        // Return the final sorted sections with their scores
+        return uniqueSections.map(item => ({
+            ...item.section,
+            matchScore: item.score,
+            matchDetails: item.matchDetails
+        }));
+    }
+    
+    /**
+     * Find each section's best matching content page
+     * @param {Array} contentPages - Array of content page objects
+     * @returns {Map} - Map of content pages to their matching sections
+     */
+    assignSectionsToBestPages(contentPages) {
+        if (!this.documentLoaded || !this.sections.length || !contentPages || !contentPages.length) {
+            return new Map();
+        }
+        
+        console.log("Assigning sections to their best matching content pages...");
+        
+        // Reset all section best match info
+        this.sections.forEach(section => {
+            section.bestMatchScore = 0;
+            section.bestMatchPage = null;
         });
         
-        console.log(`Found ${matchingSections.length} matching sections for page: ${page.title || page.url}`);
-        return matchingSections;
+        // First pass: Find best content page match for each section
+        contentPages.forEach(page => {
+            // This call will update each section's bestMatchPage and bestMatchScore
+            this.findMatchingSections(page, false);
+        });
+        
+        // Second pass: Get sections for each page, respecting exclusivity
+        const pageToSectionsMap = new Map();
+        
+        contentPages.forEach(page => {
+            const exclusiveSections = this.findMatchingSections(page, true);
+            if (exclusiveSections.length > 0) {
+                pageToSectionsMap.set(page, exclusiveSections);
+            }
+        });
+        
+        console.log(`Assigned sections to ${pageToSectionsMap.size} content pages`);
+        return pageToSectionsMap;
+    }
+    
+    /**
+     * Process scored sections to get unique best matches
+     * @param {Array} scoredSections - Array of sections with scores
+     * @returns {Array} - Array of unique best section matches
+     * @private
+     */
+    _getUniqueBestSections(scoredSections) {
+        if (scoredSections.length <= 1) {
+            return scoredSections;
+        }
+        
+        // Map to track best section by content hash to avoid duplicates
+        const bestSectionsByContent = new Map();
+        
+        // Create a simplified content hash to group similar sections
+        for (const scoredSection of scoredSections) {
+            const section = scoredSection.section;
+            // Create a simple hash of the first 100 chars to identify similar content
+            const contentHash = section.content.substring(0, 100);
+            
+            // Keep only the highest scoring section for similar content
+            if (!bestSectionsByContent.has(contentHash) || 
+                bestSectionsByContent.get(contentHash).score < scoredSection.score) {
+                bestSectionsByContent.set(contentHash, scoredSection);
+            }
+        }
+        
+        // Convert map back to array and sort by score
+        return Array.from(bestSectionsByContent.values())
+            .sort((a, b) => b.score - a.score);
     }
 
     /**
