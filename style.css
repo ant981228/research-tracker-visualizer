@@ -45,17 +45,41 @@ h1 {
 }
 
 
-#fileInput {
-    padding: 10px;
-    border: 2px dashed #3498db;
+.file-input-container {
+    display: inline-flex;
+    align-items: center;
+    padding: 15px;
+    border: 2px dashed #34495e;
     border-radius: 5px;
     background-color: #f8f9fa;
+}
+
+.file-input-label {
+    display: inline-block;
+    padding: 8px 16px;
+    background-color: white;
+    border: 2px solid #34495e;
+    border-radius: 5px;
     cursor: pointer;
+    font-weight: 500;
+    color: #34495e;
+    transition: all 0.3s;
+}
+
+.file-input-label:hover {
+    background-color: #34495e;
+    color: white;
+}
+
+.file-input-name {
+    margin-left: 15px;
+    color: #7f8c8d;
+    font-size: 14px;
 }
 
 #loadSample {
     padding: 10px 20px;
-    background-color: #3498db;
+    background-color: #34495e;
     color: white;
     border: none;
     border-radius: 5px;
@@ -120,8 +144,8 @@ h1 {
 }
 
 .tab-button.active {
-    color: #3498db;
-    border-bottom: 2px solid #3498db;
+    color: #34495e;
+    border-bottom: 2px solid #34495e;
     margin-bottom: -2px;
 }
 
@@ -177,7 +201,7 @@ h1 {
 }
 
 .undo-btn {
-    background-color: #3498db;
+    background-color: #34495e;
 }
 
 .undo-btn:hover:not(:disabled) {
@@ -225,35 +249,48 @@ h1 {
     background-color: #c0392b;
 }
 
-.research-summary {
-    background-color: #f8f9fa;
-    padding: 20px;
+/* Actions box styles */
+.actions-box {
+    background-color: white;
+    border: 1px solid #dee2e6;
     border-radius: 8px;
-    margin-bottom: 20px;
-    border-left: 4px solid #3498db;
+    margin: 20px 0;
+    padding: 20px;
 }
 
-.summary-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 15px;
-    margin-top: 15px;
-}
-
-.summary-item {
-    text-align: center;
-}
-
-.summary-value {
-    font-size: 24px;
-    font-weight: bold;
+.actions-box h3 {
+    margin: 0 0 20px 0;
     color: #2c3e50;
+    font-size: 20px;
+    border-bottom: 2px solid #34495e;
+    padding-bottom: 8px;
 }
 
-.summary-label {
-    font-size: 14px;
-    color: #7f8c8d;
+.actions-content {
+    display: flex;
+    gap: 40px;
+    flex-wrap: wrap;
 }
+
+.actions-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-width: 200px;
+}
+
+.actions-group button {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s;
+    text-align: left;
+}
+
+/* Research summary styles removed */
 
 .timeline-controls label {
     display: flex;
@@ -393,7 +430,6 @@ h1 {
     display: flex;
     gap: 10px;
     margin-top: 10px;
-    margin-bottom: 10px;
 }
 
 .visit-page-btn, .edit-meta-btn, .remove-page-btn {
@@ -406,7 +442,7 @@ h1 {
 }
 
 .visit-page-btn {
-    background-color: #3498db;
+    background-color: #34495e;
     color: white;
 }
 
@@ -463,7 +499,7 @@ h1 {
 
 .metadata-input:focus {
     outline: none;
-    border-color: #3498db;
+    border-color: #34495e;
 }
 
 .metadata-actions {
@@ -523,7 +559,7 @@ h1 {
 }
 
 .search-event .timeline-icon {
-    background-color: #3498db;
+    background-color: #34495e;
 }
 
 .page-event .timeline-icon {
@@ -551,7 +587,7 @@ h1 {
     margin-top: 10px;
     border-radius: 5px;
     font-style: italic;
-    border-left: 3px solid #3498db;
+    border-left: 3px solid #34495e;
 }
 
 .metadata-section {
@@ -610,47 +646,47 @@ h1 {
     border-top: 1px solid #eee;
 }
 
-.teacher-feedback {
-    margin-top: 15px;
+.teacher-annotation {
+    margin-top: 10px;
     padding: 15px;
     background-color: #fff3cd;
     border-radius: 5px;
     border-left: 4px solid #f39c12;
 }
 
-.feedback-header {
+.annotation-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 10px;
 }
 
-.feedback-label {
+.annotation-label {
     font-weight: 600;
     color: #856404;
 }
 
-.feedback-content {
+.annotation-content {
     color: #856404;
     line-height: 1.6;
 }
 
-.add-feedback-btn {
-    padding: 8px 15px;
+.add-annotation-btn {
+    padding: 6px 12px;
     background-color: #f39c12;
     color: white;
     border: none;
-    border-radius: 5px;
+    border-radius: 4px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 13px;
     margin-top: 10px;
 }
 
-.add-feedback-btn:hover {
+.add-annotation-btn:hover {
     background-color: #e67e22;
 }
 
-.edit-feedback-btn, .delete-feedback-btn {
+.edit-annotation-btn, .delete-annotation-btn {
     padding: 8px 15px;
     color: white;
     border: none;
@@ -659,23 +695,23 @@ h1 {
     font-size: 14px;
 }
 
-.edit-feedback-btn {
-    background-color: #3498db;
+.edit-annotation-btn {
+    background-color: #34495e;
 }
 
-.edit-feedback-btn:hover {
+.edit-annotation-btn:hover {
     background-color: #2980b9;
 }
 
-.delete-feedback-btn {
+.delete-annotation-btn {
     background-color: #e74c3c;
 }
 
-.delete-feedback-btn:hover {
+.delete-annotation-btn:hover {
     background-color: #c0392b;
 }
 
-.feedback-form {
+.annotation-form {
     margin-top: 10px;
     padding: 15px;
     background-color: white;
@@ -683,7 +719,7 @@ h1 {
     border: 1px solid #ddd;
 }
 
-.feedback-textarea {
+.annotation-textarea {
     width: 100%;
     min-height: 100px;
     padding: 10px;
@@ -693,13 +729,13 @@ h1 {
     resize: vertical;
 }
 
-.feedback-actions {
+.annotation-actions {
     display: flex;
     gap: 10px;
     margin-top: 10px;
 }
 
-.save-feedback-btn, .cancel-feedback-btn {
+.save-annotation-btn, .cancel-annotation-btn {
     padding: 8px 15px;
     border: none;
     border-radius: 5px;
@@ -707,12 +743,12 @@ h1 {
     font-size: 14px;
 }
 
-.save-feedback-btn {
+.save-annotation-btn {
     background-color: #27ae60;
     color: white;
 }
 
-.cancel-feedback-btn {
+.cancel-annotation-btn {
     background-color: #95a5a6;
     color: white;
 }
@@ -757,7 +793,7 @@ h1 {
     background-color: #f8f9fa;
     padding: 20px;
     border-radius: 8px;
-    border-left: 4px solid #3498db;
+    border-left: 4px solid #34495e;
 }
 
 .stat-card h3 {
@@ -768,7 +804,7 @@ h1 {
 .stat-value {
     font-size: 32px;
     font-weight: bold;
-    color: #3498db;
+    color: #34495e;
 }
 
 .stat-label {

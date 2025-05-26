@@ -12,8 +12,21 @@
             <h1>Research Tracker Visualizer</h1>
             <div class="header-controls">
                 <div class="upload-section">
-                    <input type="file" id="fileInput" accept=".json">
-                    <button id="loadSample">Load Sample Data</button>
+                    <div class="file-input-container">
+                        <label for="fileInput" class="file-input-label">
+                            <span class="file-input-text">Choose JSON File</span>
+                            <input type="file" id="fileInput" accept=".json" style="display: none;">
+                        </label>
+                        <span id="fileInputName" class="file-input-name">No JSON file chosen</span>
+                    </div>
+                    <div class="file-input-container">
+                        <label for="docxInput" class="file-input-label">
+                            <span class="file-input-text">Choose DOCX File</span>
+                            <input type="file" id="docxInput" accept=".docx" style="display: none;">
+                        </label>
+                        <span id="docxInputName" class="file-input-name">No DOCX file chosen</span>
+                    </div>
+                    <button id="loadSample">Load Sample JSON Data</button>
                 </div>
             </div>
         </header>
@@ -28,6 +41,20 @@
             </div>
         </div>
 
+        <div id="actionsBox" class="actions-box hidden">
+            <h3>Actions</h3>
+            <div class="actions-content">
+                <div class="actions-group">
+                    <button id="exportAnnotations" class="export-btn">Export Annotations</button>
+                    <button id="exportModified" class="export-btn">Export Modified Data</button>
+                </div>
+                <div class="actions-group">
+                    <button id="undoBtn" class="undo-btn" disabled>Undo</button>
+                    <button id="restorePages" class="restore-btn">Restore All Removed Items</button>
+                </div>
+            </div>
+        </div>
+
         <div id="visualization" class="visualization hidden">
             <div class="tabs">
                 <button class="tab-button active" data-tab="timeline">Timeline View</button>
@@ -38,28 +65,20 @@
                 <div class="timeline-header">
                     <div class="timeline-controls">
                         <label>
-                            <input type="checkbox" id="showSearches" checked> Show Searches
-                        </label>
-                        <label>
                             <input type="checkbox" id="showPages" checked> Show Pages
                         </label>
                         <label>
-                            <input type="checkbox" id="showNotes" checked> Show Notes
+                            <input type="checkbox" id="showNotes"> Show Notes
                         </label>
                         <label>
-                            <input type="checkbox" id="showFeedback" checked> Show Feedback
+                            <input type="checkbox" id="showAnnotations"> Show Annotations
                         </label>
                     </div>
                     <div class="timeline-actions">
                         <button id="expandAll" class="expand-btn">Expand All</button>
                         <button id="collapseAll" class="collapse-btn">Collapse All</button>
-                        <button id="exportFeedback" class="export-btn">Export Annotations</button>
-                        <button id="exportModified" class="export-btn">Export Modified Data</button>
-                        <button id="undoBtn" class="undo-btn" disabled>Undo</button>
-                        <button id="restorePages" class="restore-btn">Restore Removed Pages</button>
                     </div>
                 </div>
-                <div class="research-summary" id="researchSummary"></div>
                 <div id="timelineContent"></div>
             </div>
 

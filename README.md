@@ -4,18 +4,18 @@ An interactive web-based visualization tool for exploring and analyzing research
 
 ## Overview
 
-The Research Tracker Visualizer transforms exported research data into interactive visualizations, helping you:
-- Explore your research journey through timeline and graph views
+The Research Tracker Visualizer transforms exported research data into an interactive timeline, helping you:
+- Explore your research journey chronologically
 - Analyze patterns in your search behavior
 - Review and organize visited content
 - Export formatted citations for your research
 
 ## Features
 
-### 📊 Interactive Visualizations
-- **Timeline View**: See your research chronologically with all searches, visits, and notes
-- **Graph View**: Explore connections between searches and discovered content
-- **Dual-View Mode**: Use timeline and graph views simultaneously
+### 📊 Interactive Timeline
+- See your research chronologically with all searches, visits, and notes
+- Interactive timeline with zoom and pan controls
+- Hover over items for quick previews
 
 ### 🔍 Search & Filter
 - Filter by content type (searches, pages, notes)
@@ -41,7 +41,7 @@ The Research Tracker Visualizer transforms exported research data into interacti
 1. Open `index.html` in a modern web browser
 2. Click "Import Research Data"
 3. Select a JSON export file from the Research Tracker Extension
-4. Explore your research using the various visualization modes
+4. Explore your research using the interactive timeline
 
 ### System Requirements
 - Modern web browser (Chrome, Firefox, Safari, Edge)
@@ -62,15 +62,9 @@ The Research Tracker Visualizer transforms exported research data into interacti
 - Use filters to focus on specific types of content
 - Hover over items for quick previews
 
-### Graph View
-- Nodes represent searches and visited pages
-- Edges show the connections between searches and discoveries
-- Drag nodes to rearrange the layout
-- Click nodes to view details
-- Use zoom controls to navigate large graphs
 
 ### Working with Citations
-1. Click on any visited page in the timeline or graph
+1. Click on any visited page in the timeline
 2. View the metadata panel
 3. Choose your citation format
 4. Click "Copy Citation" to copy to clipboard
@@ -85,16 +79,10 @@ The Research Tracker Visualizer transforms exported research data into interacti
 ## Interface Overview
 
 ### Main Components
-- **Header**: Import button, view toggles, search bar
+- **Header**: Import button, search bar, and controls
 - **Sidebar**: Filters, statistics, and options
-- **Main View**: Timeline or graph visualization
+- **Main View**: Interactive timeline visualization
 - **Detail Panel**: Shows information about selected items
-
-### Keyboard Shortcuts
-- `Space`: Play/pause timeline animation
-- `←/→`: Navigate timeline
-- `+/-`: Zoom in/out on graph
-- `Esc`: Close detail panels
 
 ## Data Privacy
 
@@ -126,7 +114,6 @@ The Research Tracker Visualizer transforms exported research data into interacti
 
 ### Technologies Used
 - HTML5, CSS3, JavaScript (ES6+)
-- D3.js for graph visualizations
 - No external dependencies or frameworks
 
 ### Browser Compatibility

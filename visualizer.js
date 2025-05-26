@@ -1,6 +1,6 @@
 let sessionData = null;
 let viewMode = 'teacher'; // Always teacher view
-let feedbackData = {};
+let annotationData = {};
 let removedPages = new Set();
 let removedSearches = new Set(); // Store removed searches
 let lastAction = null; // For undo functionality
@@ -103,7 +103,29 @@ const sampleData = {
 
 // Initialize the visualizer
 document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+        // Update filename display
+        const fileName = e.target.files[0]?.name || 'No JSON file chosen';
+        document.getElementById('fileInputName').textContent = fileName;
+        
+        // Handle the file upload
+        if (e.target.files[0]) {
+            handleFileUpload(e);
+        }
+    });
+    
+    document.getElementById('docxInput').addEventListener('change', function(e) {
+        // Update filename display
+        const fileName = e.target.files[0]?.name || 'No DOCX file chosen';
+        document.getElementById('docxInputName').textContent = fileName;
+        
+        // Handle the DOCX file upload (to be implemented)
+        if (e.target.files[0]) {
+            // TODO: Implement DOCX file handling
+            console.log('DOCX file selected:', fileName);
+        }
+    });
+    
     document.getElementById('loadSample').addEventListener('click', loadSampleData);
     
     // Tab switching
@@ -112,13 +134,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Timeline filters
-    document.getElementById('showSearches').addEventListener('change', updateTimeline);
     document.getElementById('showPages').addEventListener('change', updateTimeline);
     document.getElementById('showNotes').addEventListener('change', updateTimeline);
-    document.getElementById('showFeedback').addEventListener('change', updateTimeline);
+    document.getElementById('showAnnotations').addEventListener('change', updateTimeline);
     
     // Export buttons
-    document.getElementById('exportFeedback').addEventListener('click', exportFeedback);
+    document.getElementById('exportAnnotations').addEventListener('click', exportAnnotations);
     document.getElementById('exportModified').addEventListener('click', exportModifiedData);
     
     // Expand/Collapse buttons
@@ -130,7 +151,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('restorePages').addEventListener('click', restoreAllRemovedPages);
     
     // Load saved data from localStorage
-    loadSavedFeedback();
+    loadSavedAnnotations();
     loadRemovedPages();
     loadRemovedSearches();
     loadEditedMetadata();
@@ -169,17 +190,18 @@ function processSessionData() {
     // Clear previous session data
     removedPages.clear();
     removedSearches.clear();
-    feedbackData = {};
+    annotationData = {};
     editedMetadata = {};
     
     // Load saved data for this session
-    loadSavedFeedback();
+    loadSavedAnnotations();
     loadRemovedPages();
     loadRemovedSearches();
     loadEditedMetadata();
     
     // Show visualization sections
     document.getElementById('sessionInfo').classList.remove('hidden');
+    document.getElementById('actionsBox').classList.remove('hidden');
     document.getElementById('visualization').classList.remove('hidden');
     
     // Update session info
@@ -204,16 +226,12 @@ function updateSessionInfo() {
     const noteCount = sessionData.searches.reduce((count, search) => count + (search.notes?.length || 0), 0) +
                      sessionData.contentPages.reduce((count, page) => count + (page.notes?.length || 0), 0);
     document.getElementById('noteCount').textContent = `Notes: ${noteCount}`;
-    
-    // Update research summary
-    updateResearchSummary();
 }
 
 function updateTimeline() {
-    const showSearches = document.getElementById('showSearches').checked;
     const showPages = document.getElementById('showPages').checked;
     const showNotes = document.getElementById('showNotes').checked;
-    const showFeedback = document.getElementById('showFeedback').checked;
+    const showAnnotations = document.getElementById('showAnnotations').checked;
     
     const timelineContent = document.getElementById('timelineContent');
     timelineContent.innerHTML = '';
@@ -223,9 +241,7 @@ function updateTimeline() {
     
     // Create timeline items for each search group
     searchGroups.forEach((group, groupIndex) => {
-        if (!showSearches && group.pages.length === 0) return;
-        
-        const searchContainer = createSearchContainer(group, groupIndex, showPages, showNotes, showFeedback);
+        const searchContainer = createSearchContainer(group, groupIndex, showPages, showNotes, showAnnotations);
         timelineContent.appendChild(searchContainer);
     });
     
@@ -249,7 +265,7 @@ function updateTimeline() {
         orphanContainer.appendChild(orphanHeader);
         
         orphanedPagesFiltered.forEach(({ page, pageId }) => {
-            const pageItem = createPageItem(page, pageId, showNotes, showFeedback);
+            const pageItem = createPageItem(page, pageId, showNotes, showAnnotations);
             orphanContainer.appendChild(pageItem);
         });
         
@@ -263,11 +279,11 @@ function createTimelineItem(event, index) {
     item.dataset.eventIndex = index;
     
     const eventId = `${event.type}-${index}`;
-    const feedback = feedbackData[eventId];
+    const annotation = annotationData[eventId];
     
-    if (feedback) {
-        item.classList.add('has-feedback');
-        if (feedback.quality === 'excellent') {
+    if (annotation) {
+        item.classList.add('has-annotation');
+        if (annotation.quality === 'excellent') {
             item.classList.add('excellent-source');
         }
     }
@@ -425,19 +441,20 @@ function createTimelineItem(event, index) {
         content.appendChild(noteContent);
     }
     
-    // Add teacher feedback section
-    if (viewMode === 'teacher' || (feedback && document.getElementById('showFeedback').checked)) {
-        if (feedback) {
-            const feedbackDiv = createFeedbackDisplay(feedback, eventId);
-            content.appendChild(feedbackDiv);
+    // Add annotation section
+    const showAnnotations = document.getElementById('showAnnotations').checked;
+    if (showAnnotations && (viewMode === 'teacher' || annotation)) {
+        if (annotation) {
+            const annotationDiv = createAnnotationDisplay(annotation, eventId);
+            content.appendChild(annotationDiv);
         }
         
-        if (viewMode === 'teacher' && !feedback) {
-            const addFeedbackBtn = document.createElement('button');
-            addFeedbackBtn.className = 'add-feedback-btn';
-            addFeedbackBtn.textContent = 'Add Feedback';
-            addFeedbackBtn.onclick = () => showFeedbackForm(eventId, event);
-            content.appendChild(addFeedbackBtn);
+        if (viewMode === 'teacher' && !annotation) {
+            const addAnnotationBtn = document.createElement('button');
+            addAnnotationBtn.className = 'add-annotation-btn';
+            addAnnotationBtn.textContent = 'Add Annotation';
+            addAnnotationBtn.onclick = () => showAnnotationForm(eventId, event);
+            content.appendChild(addAnnotationBtn);
         }
     }
     
@@ -552,7 +569,7 @@ function switchTab(event) {
     document.getElementById(targetTab).classList.add('active');
 }
 
-// Teacher feedback functions
+// Annotation functions
 function assessSourceQuality(page) {
     const url = page.url.toLowerCase();
     let domain = new URL(page.url).hostname.toLowerCase();
@@ -659,16 +676,16 @@ function assessSourceQuality(page) {
     return 'good';
 }
 
-function createFeedbackDisplay(feedback, eventId) {
-    const feedbackDiv = document.createElement('div');
-    feedbackDiv.className = 'teacher-feedback';
+function createAnnotationDisplay(annotation, eventId) {
+    const annotationDiv = document.createElement('div');
+    annotationDiv.className = 'teacher-annotation';
     
     const header = document.createElement('div');
-    header.className = 'feedback-header';
+    header.className = 'annotation-header';
     
     const label = document.createElement('div');
-    label.className = 'feedback-label';
-    label.textContent = 'Teacher Feedback:';
+    label.className = 'annotation-label';
+    label.textContent = 'Annotation:';
     header.appendChild(label);
     
     if (viewMode === 'teacher') {
@@ -677,14 +694,14 @@ function createFeedbackDisplay(feedback, eventId) {
         buttonContainer.style.gap = '10px';
         
         const editBtn = document.createElement('button');
-        editBtn.className = 'edit-feedback-btn';
+        editBtn.className = 'edit-annotation-btn';
         editBtn.textContent = 'Edit';
-        editBtn.onclick = function() { showFeedbackForm(eventId, null, feedback, this); };
+        editBtn.onclick = function() { showAnnotationForm(eventId, null, annotation, this); };
         
         const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'delete-feedback-btn';
+        deleteBtn.className = 'delete-annotation-btn';
         deleteBtn.textContent = 'Delete';
-        deleteBtn.onclick = () => deleteFeedback(eventId);
+        deleteBtn.onclick = () => deleteAnnotation(eventId);
         
         buttonContainer.appendChild(editBtn);
         buttonContainer.appendChild(deleteBtn);
@@ -692,37 +709,37 @@ function createFeedbackDisplay(feedback, eventId) {
     }
     
     const content = document.createElement('div');
-    content.className = 'feedback-content';
-    content.textContent = feedback.content;
+    content.className = 'annotation-content';
+    content.textContent = annotation.content;
     
-    feedbackDiv.appendChild(header);
-    feedbackDiv.appendChild(content);
+    annotationDiv.appendChild(header);
+    annotationDiv.appendChild(content);
     
-    return feedbackDiv;
+    return annotationDiv;
 }
 
-function showFeedbackForm(eventId, event, existingFeedback = null, buttonElement = null) {
+function showAnnotationForm(eventId, event, existingAnnotation = null, buttonElement = null) {
     const form = document.createElement('div');
-    form.className = 'feedback-form';
-    form.id = `feedback-form-${eventId}`;
+    form.className = 'annotation-form';
+    form.id = `annotation-form-${eventId}`;
     
     const textarea = document.createElement('textarea');
-    textarea.className = 'feedback-textarea';
-    textarea.placeholder = 'Enter your feedback here...';
-    if (existingFeedback) {
-        textarea.value = existingFeedback.content;
+    textarea.className = 'annotation-textarea';
+    textarea.placeholder = 'Enter your annotation here...';
+    if (existingAnnotation) {
+        textarea.value = existingAnnotation.content;
     }
     
     const actions = document.createElement('div');
-    actions.className = 'feedback-actions';
+    actions.className = 'annotation-actions';
     
     const saveBtn = document.createElement('button');
-    saveBtn.className = 'save-feedback-btn';
-    saveBtn.textContent = 'Save Feedback';
-    saveBtn.onclick = () => saveFeedback(eventId, textarea.value, event);
+    saveBtn.className = 'save-annotation-btn';
+    saveBtn.textContent = 'Save Annotation';
+    saveBtn.onclick = () => saveAnnotation(eventId, textarea.value, event);
     
     const cancelBtn = document.createElement('button');
-    cancelBtn.className = 'cancel-feedback-btn';
+    cancelBtn.className = 'cancel-annotation-btn';
     cancelBtn.textContent = 'Cancel';
     cancelBtn.onclick = () => {
         form.remove();
@@ -737,11 +754,11 @@ function showFeedbackForm(eventId, event, existingFeedback = null, buttonElement
     
     // If we have a button element reference, use it directly
     if (buttonElement) {
-        if (existingFeedback) {
-            // For edit button, replace the parent feedback div
-            const feedbackDiv = buttonElement.closest('.teacher-feedback');
-            if (feedbackDiv) {
-                feedbackDiv.replaceWith(form);
+        if (existingAnnotation) {
+            // For edit button, replace the parent annotation div
+            const annotationDiv = buttonElement.closest('.teacher-annotation');
+            if (annotationDiv) {
+                annotationDiv.replaceWith(form);
             }
         } else {
             // For add button, replace the button itself
@@ -753,13 +770,13 @@ function showFeedbackForm(eventId, event, existingFeedback = null, buttonElement
     }
 }
 
-function saveFeedback(eventId, content, event) {
+function saveAnnotation(eventId, content, event) {
     if (!content.trim()) return;
     
     // Save previous state for undo
-    const previousFeedback = feedbackData[eventId] ? { ...feedbackData[eventId] } : null;
+    const previousAnnotation = annotationData[eventId] ? { ...annotationData[eventId] } : null;
     
-    feedbackData[eventId] = {
+    annotationData[eventId] = {
         content: content.trim(),
         timestamp: new Date().toISOString(),
         quality: event && event.type === 'pageVisit' ? assessSourceQuality(event) : null
@@ -767,140 +784,142 @@ function saveFeedback(eventId, content, event) {
     
     // Track action for undo
     lastAction = {
-        type: 'feedback',
+        type: 'annotation',
         eventId: eventId,
-        previousValue: previousFeedback,
-        newValue: { ...feedbackData[eventId] }
+        previousValue: previousAnnotation,
+        newValue: { ...annotationData[eventId] }
     };
     enableUndoButton();
     
     // Save to localStorage
-    localStorage.setItem(`feedback-${sessionData.id}`, JSON.stringify(feedbackData));
+    localStorage.setItem(`annotations-${sessionData.id}`, JSON.stringify(annotationData));
     
     // Refresh timeline
     updateTimeline();
 }
 
-function loadSavedFeedback() {
+function loadSavedAnnotations() {
     if (sessionData && sessionData.id) {
-        const saved = localStorage.getItem(`feedback-${sessionData.id}`);
+        const saved = localStorage.getItem(`annotations-${sessionData.id}`);
         if (saved) {
-            feedbackData = JSON.parse(saved);
+            annotationData = JSON.parse(saved);
         }
     }
 }
 
-function deleteFeedback(eventId) {
-    if (confirm('Are you sure you want to delete this feedback?')) {
+function deleteAnnotation(eventId) {
+    if (confirm('Are you sure you want to delete this annotation?')) {
         // Save previous state for undo
-        const previousFeedback = feedbackData[eventId] ? { ...feedbackData[eventId] } : null;
+        const previousAnnotation = annotationData[eventId] ? { ...annotationData[eventId] } : null;
         
-        delete feedbackData[eventId];
+        delete annotationData[eventId];
         
         // Track action for undo
         lastAction = {
-            type: 'deleteFeedback',
+            type: 'deleteAnnotation',
             eventId: eventId,
-            previousValue: previousFeedback
+            previousValue: previousAnnotation
         };
         enableUndoButton();
         
         // Save to localStorage
-        localStorage.setItem(`feedback-${sessionData.id}`, JSON.stringify(feedbackData));
+        localStorage.setItem(`annotations-${sessionData.id}`, JSON.stringify(annotationData));
         
         // Refresh timeline
         updateTimeline();
     }
 }
 
-function updateResearchSummary() {
-    const summaryDiv = document.getElementById('researchSummary');
-    summaryDiv.style.display = 'block';
+// Research summary function removed - no longer needed
+
+function exportAnnotations() {
+    if (!sessionData || Object.keys(annotationData).length === 0) {
+        alert('No annotations to export');
+        return;
+    }
     
-    // Calculate statistics
-    const uniqueDomains = new Set();
-    const sourceTypes = { excellent: 0, good: 0, questionable: 0, poor: 0 };
-    let totalTimeSpent = 0;
-    let searchRefinements = 0;
+    let textContent = `RESEARCH ANNOTATIONS\n`;
+    textContent += `Session: ${sessionData.name}\n`;
+    textContent += `Student: ${sessionData.studentName || 'Unknown Student'}\n`;
+    textContent += `Export Date: ${new Date().toLocaleString()}\n`;
+    textContent += `${'='.repeat(60)}\n\n`;
     
-    sessionData.contentPages.forEach(page => {
-        if (!shouldFilterPage(page)) {
-            const domain = new URL(page.url).hostname;
-            uniqueDomains.add(domain);
-            const quality = assessSourceQuality(page);
-            sourceTypes[quality]++;
+    let entryCount = 0;
+    
+    // Process search groups and their associated pages
+    const searchGroups = groupSearchesAndPages();
+    searchGroups.forEach((group, groupIndex) => {
+        const searchId = `search-group-${groupIndex}`;
+        const hasSearchAnnotation = annotationData[searchId];
+        
+        // Check if any pages in this group have annotations
+        const pagesWithAnnotations = [];
+        group.pages.forEach((page, pageIndex) => {
+            const pageId = `page-${groupIndex}-${pageIndex}`;
+            if (annotationData[pageId]) {
+                pagesWithAnnotations.push({ page, pageId, pageIndex });
+            }
+        });
+        
+        // Only output if there are annotations for this search or its pages
+        if (hasSearchAnnotation || pagesWithAnnotations.length > 0) {
+            entryCount++;
+            textContent += `\nSEARCH #${entryCount}\n`;
+            textContent += `Query: "${group.query}" on ${group.engine}\n`;
+            textContent += `Time: ${new Date(group.firstTimestamp).toLocaleString()}\n`;
+            
+            if (hasSearchAnnotation) {
+                textContent += `\nSEARCH ANNOTATION:\n${annotationData[searchId].content}\n`;
+            }
+            
+            // Add associated pages with annotations
+            if (pagesWithAnnotations.length > 0) {
+                textContent += `\nASSOCIATED PAGES WITH ANNOTATIONS:\n`;
+                pagesWithAnnotations.forEach(({ page, pageId }, idx) => {
+                    textContent += `\n  Page ${idx + 1}: ${page.title || 'Untitled Page'}\n`;
+                    textContent += `  URL: ${page.url}\n`;
+                    textContent += `  Time: ${new Date(page.timestamp).toLocaleString()}\n`;
+                    textContent += `  ANNOTATION: ${annotationData[pageId].content}\n`;
+                });
+            }
+            
+            textContent += `\n${'-'.repeat(60)}\n`;
         }
     });
     
-    // Look for search refinements
-    const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were']);
+    // Process orphaned pages (pages without a source search)
+    const orphanedPages = sessionData.contentPages.filter(page => !page.sourceSearch);
+    let hasOrphanedAnnotations = false;
     
-    function getSignificantWords(query) {
-        return query.toLowerCase()
-            .split(/\s+/)
-            .filter(word => word.length > 2 && !stopWords.has(word));
+    orphanedPages.forEach((page, index) => {
+        const orphanId = `page-orphan-${index}`;
+        if (annotationData[orphanId]) {
+            if (!hasOrphanedAnnotations) {
+                textContent += `\nDIRECT PAGE VISITS (No Associated Search)\n`;
+                textContent += `${'='.repeat(40)}\n`;
+                hasOrphanedAnnotations = true;
+            }
+            
+            entryCount++;
+            textContent += `\nPAGE #${entryCount}\n`;
+            textContent += `Title: ${page.title || 'Untitled Page'}\n`;
+            textContent += `URL: ${page.url}\n`;
+            textContent += `Time: ${new Date(page.timestamp).toLocaleString()}\n`;
+            textContent += `\nANNOTATION:\n${annotationData[orphanId].content}\n`;
+            textContent += `\n${'-'.repeat(60)}\n`;
+        }
+    });
+    
+    if (entryCount === 0) {
+        textContent += `\nNo annotations found.\n`;
     }
     
-    for (let i = 1; i < sessionData.searches.length; i++) {
-        const currentWords = getSignificantWords(sessionData.searches[i].query);
-        const previousWords = getSignificantWords(sessionData.searches[i-1].query);
-        
-        // Check if current search shares at least half the words with previous search
-        // and has additional words (indicating refinement)
-        const sharedWords = currentWords.filter(word => previousWords.includes(word));
-        const isRefinement = sharedWords.length >= previousWords.length / 2 && 
-                           currentWords.length > previousWords.length;
-        
-        // Also check if it's the same engine (refinements typically use same search engine)
-        if (isRefinement && sessionData.searches[i].engine === sessionData.searches[i-1].engine) {
-            searchRefinements++;
-        }
-    }
-    
-    summaryDiv.innerHTML = `
-        <h3>Research Quality Summary</h3>
-        <div class="summary-grid">
-            <div class="summary-item">
-                <div class="summary-value">${uniqueDomains.size}</div>
-                <div class="summary-label">Unique Sources</div>
-            </div>
-            <div class="summary-item">
-                <div class="summary-value">${sourceTypes.excellent}</div>
-                <div class="summary-label">Academic Sources</div>
-            </div>
-            <div class="summary-item">
-                <div class="summary-value">${searchRefinements}</div>
-                <div class="summary-label">Search Refinements</div>
-            </div>
-            <div class="summary-item">
-                <div class="summary-value">${Object.values(sourceTypes).reduce((a, b) => a + b, 0) > 0 ? 
-                    Math.round((sourceTypes.excellent + sourceTypes.good) / Object.values(sourceTypes).reduce((a, b) => a + b, 0) * 100) : 0}%</div>
-                <div class="summary-label">Quality Sources</div>
-            </div>
-        </div>
-    `;
-}
-
-function exportFeedback() {
-    const exportData = {
-        sessionId: sessionData.id,
-        sessionName: sessionData.name,
-        studentName: sessionData.studentName || 'Unknown Student',
-        exportDate: new Date().toISOString(),
-        feedback: feedbackData,
-        summary: {
-            totalEvents: sessionData.chronologicalEvents.length,
-            searches: sessionData.searches.length,
-            pagesVisited: sessionData.contentPages.length,
-            feedbackProvided: Object.keys(feedbackData).length
-        }
-    };
-    
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    // Create and download the text file
+    const blob = new Blob([textContent], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `feedback-${sessionData.name.replace(/[^a-z0-9]/gi, '_')}-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `annotations-${sessionData.name.replace(/[^a-z0-9]/gi, '_')}-${new Date().toISOString().split('T')[0]}.txt`;
     a.click();
     URL.revokeObjectURL(url);
 }
@@ -1032,7 +1051,7 @@ function groupSearchesAndPages() {
     return groups;
 }
 
-function createSearchContainer(group, groupIndex, showPages, showNotes, showFeedback) {
+function createSearchContainer(group, groupIndex, showPages, showNotes, showAnnotations) {
     const container = document.createElement('div');
     container.className = 'search-group';
     container.dataset.groupIndex = groupIndex;
@@ -1103,22 +1122,22 @@ function createSearchContainer(group, groupIndex, showPages, showNotes, showFeed
         searchInfo.appendChild(searchActions);
     }
     
-    // Add teacher feedback options
+    // Add annotation options
     const searchId = `search-group-${groupIndex}`;
-    const feedback = feedbackData[searchId];
+    const annotation = annotationData[searchId];
     
-    if (viewMode === 'teacher' || (feedback && showFeedback)) {
-        if (feedback) {
-            const feedbackDiv = createFeedbackDisplay(feedback, searchId);
-            searchInfo.appendChild(feedbackDiv);
+    if (showAnnotations && (viewMode === 'teacher' || annotation)) {
+        if (annotation) {
+            const annotationDiv = createAnnotationDisplay(annotation, searchId);
+            searchInfo.appendChild(annotationDiv);
         }
         
-        if (viewMode === 'teacher' && !feedback) {
-            const addFeedbackBtn = document.createElement('button');
-            addFeedbackBtn.className = 'add-feedback-btn';
-            addFeedbackBtn.textContent = 'Add Annotation';
-            addFeedbackBtn.onclick = function() { showFeedbackForm(searchId, group.searches[0], null, this); };
-            searchInfo.appendChild(addFeedbackBtn);
+        if (viewMode === 'teacher' && !annotation) {
+            const addAnnotationBtn = document.createElement('button');
+            addAnnotationBtn.className = 'add-annotation-btn';
+            addAnnotationBtn.textContent = 'Add Annotation';
+            addAnnotationBtn.onclick = function() { showAnnotationForm(searchId, group.searches[0], null, this); };
+            searchInfo.appendChild(addAnnotationBtn);
         }
     }
     
@@ -1139,7 +1158,7 @@ function createSearchContainer(group, groupIndex, showPages, showNotes, showFeed
         group.pages.forEach((page, pageIndex) => {
             const pageId = `page-${groupIndex}-${pageIndex}`;
             if (!removedPages.has(pageId)) {
-                const pageItem = createPageItem(page, pageId, showNotes, showFeedback);
+                const pageItem = createPageItem(page, pageId, showNotes, showAnnotations);
                 pagesContainer.appendChild(pageItem);
             }
         });
@@ -1150,7 +1169,7 @@ function createSearchContainer(group, groupIndex, showPages, showNotes, showFeed
     return container;
 }
 
-function createPageItem(page, pageId, showNotes, showFeedback) {
+function createPageItem(page, pageId, showNotes, showAnnotations) {
     const item = document.createElement('div');
     item.className = 'page-item';
     
@@ -1335,21 +1354,21 @@ function createPageItem(page, pageId, showNotes, showFeedback) {
     
     content.appendChild(actionButtons);
     
-    // Add teacher feedback
-    const feedback = feedbackData[pageId];
+    // Add annotations
+    const annotation = annotationData[pageId];
     
-    if (viewMode === 'teacher' || (feedback && showFeedback)) {
-        if (feedback) {
-            const feedbackDiv = createFeedbackDisplay(feedback, pageId);
-            content.appendChild(feedbackDiv);
+    if (showAnnotations && (viewMode === 'teacher' || annotation)) {
+        if (annotation) {
+            const annotationDiv = createAnnotationDisplay(annotation, pageId);
+            content.appendChild(annotationDiv);
         }
         
-        if (viewMode === 'teacher' && !feedback) {
-            const addFeedbackBtn = document.createElement('button');
-            addFeedbackBtn.className = 'add-feedback-btn';
-            addFeedbackBtn.textContent = 'Add Annotation';
-            addFeedbackBtn.onclick = function() { showFeedbackForm(pageId, page, null, this); };
-            content.appendChild(addFeedbackBtn);
+        if (viewMode === 'teacher' && !annotation) {
+            const addAnnotationBtn = document.createElement('button');
+            addAnnotationBtn.className = 'add-annotation-btn';
+            addAnnotationBtn.textContent = 'Add Annotation';
+            addAnnotationBtn.onclick = function() { showAnnotationForm(pageId, page, null, this); };
+            content.appendChild(addAnnotationBtn);
         }
     }
     
@@ -1418,6 +1437,14 @@ function clearRemovedPages() {
     updateTimeline();
 }
 
+function clearRemovedSearches() {
+    removedSearches.clear();
+    if (sessionData && sessionData.id) {
+        localStorage.removeItem(`removed-searches-${sessionData.id}`);
+    }
+    updateTimeline();
+}
+
 function enableUndoButton() {
     const undoBtn = document.getElementById('undoBtn');
     if (undoBtn) {
@@ -1425,10 +1452,10 @@ function enableUndoButton() {
         // Update button text to show what will be undone
         if (lastAction) {
             switch (lastAction.type) {
-                case 'feedback':
+                case 'annotation':
                     undoBtn.textContent = 'Undo Annotation';
                     break;
-                case 'deleteFeedback':
+                case 'deleteAnnotation':
                     undoBtn.textContent = 'Undo Delete';
                     break;
                 case 'removePage':
@@ -1462,21 +1489,21 @@ function performUndo() {
     if (!lastAction) return;
     
     switch (lastAction.type) {
-        case 'feedback':
-            // Restore previous feedback state
+        case 'annotation':
+            // Restore previous annotation state
             if (lastAction.previousValue) {
-                feedbackData[lastAction.eventId] = lastAction.previousValue;
+                annotationData[lastAction.eventId] = lastAction.previousValue;
             } else {
-                delete feedbackData[lastAction.eventId];
+                delete annotationData[lastAction.eventId];
             }
-            localStorage.setItem(`feedback-${sessionData.id}`, JSON.stringify(feedbackData));
+            localStorage.setItem(`annotations-${sessionData.id}`, JSON.stringify(annotationData));
             break;
             
-        case 'deleteFeedback':
-            // Restore deleted feedback
+        case 'deleteAnnotation':
+            // Restore deleted annotation
             if (lastAction.previousValue) {
-                feedbackData[lastAction.eventId] = lastAction.previousValue;
-                localStorage.setItem(`feedback-${sessionData.id}`, JSON.stringify(feedbackData));
+                annotationData[lastAction.eventId] = lastAction.previousValue;
+                localStorage.setItem(`annotations-${sessionData.id}`, JSON.stringify(annotationData));
             }
             break;
             
@@ -1489,10 +1516,18 @@ function performUndo() {
             break;
             
         case 'restoreAll':
-            // Re-remove all previously removed pages
-            removedPages = new Set(lastAction.previousRemovedPages);
-            if (sessionData && sessionData.id) {
-                localStorage.setItem(`removed-pages-${sessionData.id}`, JSON.stringify(Array.from(removedPages)));
+            // Re-remove all previously removed pages and searches
+            if (lastAction.previousRemovedPages) {
+                removedPages = new Set(lastAction.previousRemovedPages);
+                if (sessionData && sessionData.id) {
+                    localStorage.setItem(`removed-pages-${sessionData.id}`, JSON.stringify(Array.from(removedPages)));
+                }
+            }
+            if (lastAction.previousRemovedSearches) {
+                removedSearches = new Set(lastAction.previousRemovedSearches);
+                if (sessionData && sessionData.id) {
+                    localStorage.setItem(`removed-searches-${sessionData.id}`, JSON.stringify(Array.from(removedSearches)));
+                }
             }
             break;
             
@@ -1528,23 +1563,35 @@ function performUndo() {
 }
 
 function restoreAllRemovedPages() {
-    if (removedPages.size === 0) {
-        alert('No pages have been removed.');
+    const pageCount = removedPages.size;
+    const searchCount = removedSearches.size;
+    
+    if (pageCount === 0 && searchCount === 0) {
+        alert('No items have been removed.');
         return;
     }
     
-    const count = removedPages.size;
-    const confirmMessage = `Restore ${count} removed page${count > 1 ? 's' : ''}?`;
+    let confirmMessage = 'Restore ';
+    const items = [];
+    if (pageCount > 0) {
+        items.push(`${pageCount} page${pageCount > 1 ? 's' : ''}`);
+    }
+    if (searchCount > 0) {
+        items.push(`${searchCount} search${searchCount > 1 ? 'es' : ''}`);
+    }
+    confirmMessage += items.join(' and ') + '?';
     
     if (confirm(confirmMessage)) {
-        // Track action for undo (store all removed pages)
+        // Track action for undo (store all removed items)
         lastAction = {
             type: 'restoreAll',
-            previousRemovedPages: new Set(removedPages)
+            previousRemovedPages: new Set(removedPages),
+            previousRemovedSearches: new Set(removedSearches)
         };
         enableUndoButton();
         
         clearRemovedPages();
+        clearRemovedSearches();
     }
 }
 
@@ -1913,7 +1960,7 @@ function exportModifiedData() {
     ].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     
     // Add teacher annotations as a new field
-    modifiedData.teacherAnnotations = feedbackData;
+    modifiedData.teacherAnnotations = annotationData;
     
     // Export the modified data
     const blob = new Blob([JSON.stringify(modifiedData, null, 2)], { type: 'application/json' });
