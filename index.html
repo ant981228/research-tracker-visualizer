@@ -25,6 +25,7 @@
                             <input type="file" id="docxInput" accept=".docx" style="display: none;">
                         </label>
                         <span id="docxInputName" class="file-input-name">No DOCX file chosen</span>
+                        <a id="parsedSectionsLink" class="parsed-sections-link hidden" href="#">Parsed 0 Sections</a>
                     </div>
                     <button id="loadSample">Load Sample JSON Data</button>
                 </div>
@@ -88,6 +89,19 @@
         </div>
     </div>
 
+    <!-- Modal for showing parsed sections -->
+    <div id="sectionsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Parsed Document Sections</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <ul id="sectionsList" class="sections-list"></ul>
+        </div>
+    </div>
+
+    <!-- Add Mammoth.js for DOCX parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     <script src="visualizer.js"></script>
 </body>
 </html>

@@ -119,10 +119,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const fileName = e.target.files[0]?.name || 'No DOCX file chosen';
         document.getElementById('docxInputName').textContent = fileName;
         
-        // Handle the DOCX file upload (to be implemented)
+        // Handle the DOCX file upload
         if (e.target.files[0]) {
-            // TODO: Implement DOCX file handling
-            console.log('DOCX file selected:', fileName);
+            parseDOCXFile(e.target.files[0]);
         }
     });
     
@@ -198,6 +197,11 @@ function processSessionData() {
     loadRemovedPages();
     loadRemovedSearches();
     loadEditedMetadata();
+    
+    // Match cards to pages if DOCX was loaded
+    if (parsedCards.length > 0) {
+        matchCardsToPages();
+    }
     
     // Show visualization sections
     document.getElementById('sessionInfo').classList.remove('hidden');
@@ -1336,6 +1340,25 @@ function createPageItem(page, pageId, showNotes, showAnnotations) {
     visitBtn.onclick = () => window.open(page.url, '_blank');
     actionButtons.appendChild(visitBtn);
     
+    // View cards button
+    const viewCardsBtn = document.createElement('button');
+    const cardCount = page.cards ? page.cards.length : 0;
+    
+    if (cardCount === 0) {
+        viewCardsBtn.className = 'view-cards-btn disabled';
+        viewCardsBtn.textContent = 'No Cards';
+        viewCardsBtn.disabled = true;
+    } else if (cardCount === 1) {
+        viewCardsBtn.className = 'view-cards-btn';
+        viewCardsBtn.textContent = 'View 1 Card';
+        viewCardsBtn.onclick = () => viewCards(pageId, page);
+    } else {
+        viewCardsBtn.className = 'view-cards-btn';
+        viewCardsBtn.textContent = `View ${cardCount} Cards`;
+        viewCardsBtn.onclick = () => viewCards(pageId, page);
+    }
+    actionButtons.appendChild(viewCardsBtn);
+    
     // Edit metadata button
     const editMetaBtn = document.createElement('button');
     editMetaBtn.className = 'edit-meta-btn';
@@ -1990,4 +2013,504 @@ function getPageIndexInGroup(page, originalIndex) {
         }
     }
     return originalIndex;
+}
+
+// Global variable to store parsed sections and cards
+let parsedSections = [];
+let parsedCards = [];
+
+// Function to parse DOCX file
+async function parseDOCXFile(file) {
+    try {
+        const arrayBuffer = await file.arrayBuffer();
+        
+        // Use mammoth to convert DOCX to HTML
+        const result = await mammoth.convertToHtml({
+            arrayBuffer: arrayBuffer
+        });
+        
+        // Parse the HTML to extract sections
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(result.value, 'text/html');
+        
+        // Reset parsed sections and cards
+        parsedSections = [];
+        parsedCards = [];
+        
+        // Find all headers (h1, h2, h3, h4)
+        const headers = doc.querySelectorAll('h1, h2, h3, h4');
+        
+        headers.forEach((header, index) => {
+            const level = parseInt(header.tagName[1]);
+            const headerText = header.textContent.trim();
+            
+            // Get all content between this header and the next header
+            let content = [];
+            let currentElement = header.nextElementSibling;
+            
+            while (currentElement && !['H1', 'H2', 'H3', 'H4'].includes(currentElement.tagName)) {
+                content.push(currentElement.outerHTML);
+                currentElement = currentElement.nextElementSibling;
+            }
+            
+            const section = {
+                level: level,
+                header: headerText,
+                content: content.join(''),
+                contentText: content.map(html => {
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = html;
+                    return tempDiv.textContent || tempDiv.innerText || '';
+                }).join(' '),
+                index: index
+            };
+            
+            parsedSections.push(section);
+            
+            // If this is a level 4 header, it's a card
+            if (level === 4) {
+                parsedCards.push(section);
+            }
+        });
+        
+        // Update the UI
+        updateParsedSectionsUI();
+        
+        // Match cards to pages if session data exists
+        if (sessionData) {
+            matchCardsToPages();
+        }
+        
+    } catch (error) {
+        console.error('Error parsing DOCX file:', error);
+        alert('Error parsing DOCX file. Please ensure it is a valid .docx file.');
+    }
+}
+
+// Function to update the parsed sections UI
+function updateParsedSectionsUI() {
+    const link = document.getElementById('parsedSectionsLink');
+    const sectionCount = parsedSections.length;
+    
+    if (sectionCount > 0) {
+        link.textContent = `Parsed ${sectionCount} Section${sectionCount !== 1 ? 's' : ''}`;
+        link.classList.remove('hidden');
+    } else {
+        link.classList.add('hidden');
+    }
+}
+
+// Function to show parsed sections modal
+function showParsedSectionsModal() {
+    const modal = document.getElementById('sectionsModal');
+    const sectionsList = document.getElementById('sectionsList');
+    
+    // Clear existing content
+    sectionsList.innerHTML = '';
+    
+    // Populate sections
+    parsedSections.forEach(section => {
+        const li = document.createElement('li');
+        li.className = `section-item section-level-${section.level}`;
+        li.innerHTML = `<div class="section-header">${section.header}</div>`;
+        sectionsList.appendChild(li);
+    });
+    
+    modal.style.display = 'block';
+}
+
+// Set up modal event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Parsed sections link click handler
+    document.getElementById('parsedSectionsLink').addEventListener('click', function(e) {
+        e.preventDefault();
+        showParsedSectionsModal();
+    });
+    
+    // Modal close button
+    document.querySelector('.close-modal').addEventListener('click', function() {
+        document.getElementById('sectionsModal').style.display = 'none';
+    });
+    
+    // Click outside modal to close
+    document.getElementById('sectionsModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            this.style.display = 'none';
+        }
+    });
+});
+
+// Function to calculate position-weighted match score
+function calculateMatchScore(text, searchTerms, positionWeight = true) {
+    if (!text || !searchTerms || searchTerms.length === 0) return 0;
+    
+    const lowerText = text.toLowerCase();
+    const textLength = lowerText.length;
+    let totalScore = 0;
+    
+    searchTerms.forEach(term => {
+        if (!term) return;
+        const lowerTerm = term.toLowerCase();
+        let position = lowerText.indexOf(lowerTerm);
+        
+        if (position !== -1) {
+            // Base score for finding the term
+            let score = 1;
+            
+            if (positionWeight) {
+                // Weight based on position - earlier matches get higher scores
+                // Score decreases linearly from 2.0 at position 0 to 0.5 at end
+                const positionFactor = 2.0 - (1.5 * (position / textLength));
+                score *= positionFactor;
+            }
+            
+            totalScore += score;
+        }
+    });
+    
+    return totalScore;
+}
+
+// Function to match cards to pages
+function matchCardsToPages() {
+    if (!sessionData || !sessionData.contentPages || parsedCards.length === 0) return;
+    
+    console.log('Matching cards to pages...', parsedCards.length, 'cards,', sessionData.contentPages.length, 'pages');
+    
+    // Reset all page cards
+    sessionData.contentPages.forEach(page => {
+        page.cards = [];
+    });
+    
+    // Create a map to track which cards have been assigned
+    const cardAssignments = new Map(); // cardIndex -> {pageIndex, score}
+    
+    // For each card, find the best matching pages
+    parsedCards.forEach((card, cardIndex) => {
+        const cardText = card.contentText;
+        const cardHeader = card.header;
+        
+        if (cardIndex === 0) {
+            console.log('Sample card text (first 200 chars):', cardText.substring(0, 200));
+        }
+        
+        // Score each page
+        const pageScores = sessionData.contentPages.map((page, pageIndex) => {
+            let score = 0;
+            const matchDetails = {
+                urlMatch: false,
+                titleMatch: false,
+                authorMatch: false,
+                dateMatch: false,
+                publicationMatch: false
+            };
+            
+            // Get page metadata
+            const edited = editedMetadata[`page-${pageIndex}-0`] || {};
+            const metadata = page.metadata || {};
+            const pageTitle = edited.title || metadata.title || page.title || '';
+            const pageUrl = page.url || '';
+            const author = edited.author || metadata.author || '';
+            const authors = edited.authors || metadata.authors || [];
+            const publishDate = edited.publishDate || metadata.publishDate || '';
+            const publisher = edited.publisher || metadata.publisher || '';
+            const journal = edited.journal || metadata.journal || '';
+            
+            if (cardIndex === 0 && pageIndex === 0) {
+                console.log('Sample page metadata:', {
+                    title: pageTitle,
+                    url: pageUrl,
+                    author: author,
+                    authors: authors,
+                    publishDate: publishDate,
+                    publisher: publisher,
+                    journal: journal
+                });
+            }
+            
+            // Check URL match (highest priority)
+            if (pageUrl) {
+                const urlParts = pageUrl.split(/[\/\-\._?#&=]/).filter(p => p.length > 3);
+                const urlScore = calculateMatchScore(cardText, urlParts);
+                if (urlScore > 0) {
+                    score += urlScore * 3; // Triple weight for URL matches
+                    matchDetails.urlMatch = true;
+                }
+            }
+            
+            // Check title match (high priority)
+            if (pageTitle) {
+                const titleWords = pageTitle.split(/\s+/).filter(w => w.length > 3);
+                const titleScore = calculateMatchScore(cardText, titleWords);
+                if (titleScore > 0) {
+                    score += titleScore * 2; // Double weight for title matches
+                    matchDetails.titleMatch = true;
+                }
+            }
+            
+            // Check author match
+            const allAuthors = [author, ...authors].filter(a => a);
+            if (allAuthors.length > 0) {
+                const authorScore = calculateMatchScore(cardText, allAuthors);
+                if (authorScore > 0) {
+                    score += authorScore;
+                    matchDetails.authorMatch = true;
+                }
+            }
+            
+            // Check date match
+            if (publishDate) {
+                const dateVariations = [
+                    publishDate,
+                    publishDate.replace(/-/g, '/'),
+                    publishDate.replace(/-/g, ' ')
+                ];
+                const dateScore = calculateMatchScore(cardText, dateVariations);
+                if (dateScore > 0) {
+                    score += dateScore;
+                    matchDetails.dateMatch = true;
+                }
+            }
+            
+            // Check publication match (publisher or journal)
+            const publications = [publisher, journal].filter(p => p);
+            if (publications.length > 0) {
+                const pubScore = calculateMatchScore(cardText, publications);
+                if (pubScore > 0) {
+                    score += pubScore;
+                    matchDetails.publicationMatch = true;
+                }
+            }
+            
+            // Bonus if author + date + publication all match
+            if (matchDetails.authorMatch && matchDetails.dateMatch && matchDetails.publicationMatch) {
+                score += 2;
+            }
+            
+            return {
+                pageIndex: pageIndex,
+                page: page,
+                score: score,
+                matchDetails: matchDetails
+            };
+        });
+        
+        // Sort by score and get matches above threshold
+        const threshold = 1.5; // Minimum score to consider a match
+        const validMatches = pageScores
+            .filter(ps => ps.score >= threshold)
+            .sort((a, b) => b.score - a.score);
+        
+        if (validMatches.length > 0) {
+            // Find the best match
+            const bestMatch = validMatches[0];
+            
+            // Check if this card was already assigned to a different page
+            const existingAssignment = cardAssignments.get(cardIndex);
+            
+            if (!existingAssignment || existingAssignment.score < bestMatch.score) {
+                // This is a better match, update assignment
+                cardAssignments.set(cardIndex, {
+                    pageIndex: bestMatch.pageIndex,
+                    score: bestMatch.score,
+                    page: bestMatch.page,
+                    matchDetails: bestMatch.matchDetails
+                });
+            }
+        }
+    });
+    
+    // Now assign cards to pages based on the best matches
+    cardAssignments.forEach((assignment, cardIndex) => {
+        const card = parsedCards[cardIndex];
+        const page = assignment.page;
+        
+        if (!page.cards) {
+            page.cards = [];
+        }
+        
+        page.cards.push({
+            header: card.header,
+            content: card.content,
+            contentText: card.contentText,
+            matchScore: assignment.score,
+            matchDetails: assignment.matchDetails,
+            cardIndex: cardIndex // Store for potential unlinking
+        });
+    });
+    
+    // Group pages by URL to handle same-URL pages
+    const pagesByUrl = new Map();
+    sessionData.contentPages.forEach((page, index) => {
+        const url = page.url;
+        if (!pagesByUrl.has(url)) {
+            pagesByUrl.set(url, []);
+        }
+        pagesByUrl.get(url).push({page, index});
+    });
+    
+    // For pages with the same URL, ensure they have the same cards
+    pagesByUrl.forEach((pages, url) => {
+        if (pages.length > 1) {
+            // Combine all cards from all pages with this URL
+            const allCards = [];
+            pages.forEach(({page}) => {
+                if (page.cards) {
+                    allCards.push(...page.cards);
+                }
+            });
+            
+            // Remove duplicates based on cardIndex
+            const uniqueCards = Array.from(
+                new Map(allCards.map(card => [card.cardIndex, card])).values()
+            );
+            
+            // Assign the same cards to all pages with this URL
+            pages.forEach(({page}) => {
+                page.cards = [...uniqueCards];
+            });
+        }
+    });
+    
+    // Apply quality filtering - if a page has very high matches, remove low quality ones
+    sessionData.contentPages.forEach(page => {
+        if (page.cards && page.cards.length > 0) {
+            const maxScore = Math.max(...page.cards.map(c => c.matchScore));
+            
+            // If there's an extremely good match (>80), filter out weak matches
+            if (maxScore > 80) {
+                const threshold = maxScore * 0.7; // Keep only matches within 70% of the best
+                page.cards = page.cards.filter(card => card.matchScore >= threshold);
+            }
+        }
+    });
+    
+    // Log matching results
+    let totalMatches = 0;
+    sessionData.contentPages.forEach(page => {
+        if (page.cards && page.cards.length > 0) {
+            totalMatches += page.cards.length;
+        }
+    });
+    console.log('Card matching complete. Total matches:', totalMatches);
+    
+    // Update the timeline to reflect card counts
+    updateTimeline();
+}
+
+// Function to view cards associated with a page
+function viewCards(pageId, page) {
+    if (!page.cards || page.cards.length === 0) {
+        alert('No cards matched to this page.');
+        return;
+    }
+    
+    // Create and show modal with cards
+    showCardsModal(pageId, page);
+}
+
+// Function to show cards modal
+function showCardsModal(pageId, page) {
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('cardsModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'cardsModal';
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Cards for: <span id="cardsPageTitle"></span></h3>
+                    <button class="close-modal" onclick="document.getElementById('cardsModal').style.display='none'">&times;</button>
+                </div>
+                <div id="cardsContent"></div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        // Click outside to close
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+    }
+    
+    // Update modal content
+    const pageTitle = (page.metadata && page.metadata.title) || page.title || 'Unknown Page';
+    document.getElementById('cardsPageTitle').textContent = pageTitle;
+    
+    const cardsContent = document.getElementById('cardsContent');
+    cardsContent.innerHTML = '';
+    
+    // Sort cards by match score (highest first)
+    const sortedCards = [...page.cards].sort((a, b) => b.matchScore - a.matchScore);
+    
+    sortedCards.forEach((card, index) => {
+        const cardDiv = document.createElement('div');
+        cardDiv.className = 'card-item';
+        
+        // Create match details string
+        const matchTypes = [];
+        if (card.matchDetails.urlMatch) matchTypes.push('URL');
+        if (card.matchDetails.titleMatch) matchTypes.push('Title');
+        if (card.matchDetails.authorMatch) matchTypes.push('Author');
+        if (card.matchDetails.dateMatch) matchTypes.push('Date');
+        if (card.matchDetails.publicationMatch) matchTypes.push('Publication');
+        
+        cardDiv.innerHTML = `
+            <div class="card-header">
+                <h4>${card.header}</h4>
+                <div class="match-info">
+                    <span class="match-score">Score: ${card.matchScore.toFixed(2)}</span>
+                    <span class="match-types">Matched: ${matchTypes.join(', ')}</span>
+                    <button class="unlink-card-btn" onclick="unlinkCard('${pageId}', ${index})">Unlink</button>
+                </div>
+            </div>
+            <div class="card-content">${card.content}</div>
+        `;
+        
+        cardsContent.appendChild(cardDiv);
+    });
+    
+    modal.style.display = 'block';
+}
+
+// Function to unlink a card from a page
+function unlinkCard(pageId, cardIndexInPage) {
+    // Find the page
+    let targetPage = null;
+    
+    // Check if it's an orphaned page
+    if (pageId.startsWith('orphan-')) {
+        const orphanIndex = parseInt(pageId.split('-')[1]);
+        targetPage = sessionData.contentPages.filter(p => !p.sourceSearch)[orphanIndex];
+    } else {
+        // It's a grouped page
+        const [_, groupIndex, pageIndex] = pageId.split('-').map(Number);
+        const groups = groupSearchesAndPages();
+        if (groups[groupIndex] && groups[groupIndex].pages[pageIndex]) {
+            targetPage = groups[groupIndex].pages[pageIndex];
+        }
+    }
+    
+    if (targetPage && targetPage.cards && targetPage.cards[cardIndexInPage]) {
+        // Remove the card
+        targetPage.cards.splice(cardIndexInPage, 1);
+        
+        // If this page shares a URL with other pages, update them too
+        const pageUrl = targetPage.url;
+        sessionData.contentPages.forEach(page => {
+            if (page !== targetPage && page.url === pageUrl && page.cards) {
+                // Remove the same card from pages with the same URL
+                page.cards = page.cards.filter((card, idx) => idx !== cardIndexInPage);
+            }
+        });
+        
+        // Update the modal
+        showCardsModal(pageId, targetPage);
+        
+        // Update the timeline to reflect the change
+        updateTimeline();
+    }
 }
