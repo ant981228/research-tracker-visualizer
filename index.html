@@ -4,218 +4,71 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Research Tracker Visualizer</title>
-    <link rel="stylesheet" href="css/styles.css">
-    <!-- Include D3.js for visualizations -->
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <!-- Include forceGraph library with specific version -->
-    <script src="https://unpkg.com/force-graph@1.43.1/dist/force-graph.min.js"></script>
-    <!-- Include highlighting for raw data view -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github.min.css">
-    <!-- Include mammoth.js for .docx processing -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.5.1/mammoth.browser.min.js"></script>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header>
-        <h1>Visualize Your Research</h1>
-    </header>
+    <div class="container">
+        <header>
+            <h1>Research Tracker Visualizer</h1>
+            <div class="header-controls">
+                <div class="upload-section">
+                    <input type="file" id="fileInput" accept=".json">
+                    <button id="loadSample">Load Sample Data</button>
+                </div>
+            </div>
+        </header>
 
-    <main>
-        <section id="upload-section">
-            <p class="intro-text">Visualize your research process and connect it to your cards!</p>
-            
-            <div class="main-upload-area">
-                <div class="upload-container">
-                    <h3>1. Upload Research Data</h3>
-                    <input type="file" id="file-input" accept=".json,.txt">
-                    <label for="file-input" class="file-label">Upload JSON</label>
-                    <div id="file-name">No file selected</div>
-                </div>
-                
-                <div class="doc-upload-container">
-                    <h3>2. Upload Research Document (Optional)</h3>
-                    <input type="file" id="doc-input" accept=".docx">
-                    <label for="doc-input" class="file-label">Upload Word Document</label>
-                    <div id="doc-name">No document selected</div>
-                    <div class="doc-status" id="doc-status"></div>
-                    <div id="doc-sections-container" class="doc-sections-container hidden">
-                        <h4>Detected Sections</h4>
-                        <div id="doc-sections-list" class="doc-sections-list"></div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="upload-actions">
-                <button id="import-btn" disabled class="primary-button">Go!</button>
-            </div>
-            
-            <div class="bottom-actions">
-                <button id="help-btn" class="secondary-button">Help</button>
-                <div class="sample-data">
-                    <button id="sample-data-btn" class="secondary-button">Try Sample Data</button>
-                </div>
-            </div>
-            
-            <!-- Help Modal -->
-            <div id="help-modal" class="help-modal">
-                <div class="help-modal-content">
-                    <div class="help-modal-header">
-                        <h3>How to Use the Research Tracker Visualizer</h3>
-                        <button id="help-modal-close" class="modal-close">×</button>
-                    </div>
-                    <div class="help-modal-body">
-                        <h4>Getting Started</h4>
-                        <p>This tool visualizes research data exported from the Research Tracker browser extension.</p>
-                        
-                        <h4>Step 1: Upload Research Data</h4>
-                        <p>Click "Upload JSON" to select a JSON file exported from the Research Tracker extension.</p>
-                        
-                        <h4>Step 2: Upload Document (Optional)</h4>
-                        <p>If you want to connect your research to a document, upload a Word document (.docx) file. The tool will extract cards from your document and link them to related research pages.</p>
-                        
-                        <h4>Step 3: Visualize Your Research</h4>
-                        <p>Click "Go!" to see your research displayed as a timeline. You can:</p>
-                        <ul>
-                            <li>View searches and pages chronologically</li>
-                            <li>Expand/collapse search groups</li>
-                            <li>View details for any entry</li>
-                            <li>If you uploaded a document, see the cards you cut from each page</li>
-                        </ul>
-                        
-                        <h4>Need a Demo?</h4>
-                        <p>Click "Try Sample Data" to see how the visualizer works with example data.</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <section id="visualization-container" class="hidden">
-            <div class="controls">
-                <div class="view-selector">
-                    <button data-view="timeline" class="active">Timeline View</button>
-                    <button data-view="raw">Raw Data</button>
-                </div>
-                <div class="timeline-settings">
-                    <div class="timeline-buttons">
-                        <button id="expand-all-btn" class="timeline-btn">Expand All</button>
-                        <button id="collapse-all-btn" class="timeline-btn">Collapse All</button>
-                        <button id="export-notes-btn" class="timeline-btn">Export Notes</button>
-                        <button id="go-home-btn" class="timeline-btn home-btn">Go Home</button>
-                    </div>
-                </div>
-            </div>
-            
-<!-- Removed graph view -->
-            
-            <div id="timeline-view" class="view-pane hidden">
-                <div id="timeline-container"></div>
-            </div>
-            
-            <div id="raw-view" class="view-pane hidden">
-                <div id="session-info"></div>
-                <div class="raw-data-container">
-                    <div id="raw-data"></div>
-                </div>
-            </div>
-
-            <div id="details-panel">
-                <div class="panel-header">
-                    <h3>Details</h3>
-                    <button id="close-details">×</button>
-                </div>
-                <div id="details-content">
-                    <p>Select a node to see details</p>
-                </div>
-            </div>
-        </section>
-        
-        <!-- Sections Modal -->
-        <div id="sections-modal" class="sections-modal">
-            <div class="sections-modal-content">
-                <div class="sections-modal-header">
-                    <h3 id="sections-modal-title">Content Page Sections</h3>
-                    <p id="sections-modal-subtitle"></p>
-                    <button id="sections-modal-close" class="sections-modal-close">×</button>
-                </div>
-                <div class="sections-modal-body" id="sections-modal-body">
-                    <!-- Sections will be inserted here -->
-                </div>
-                <div class="sections-modal-footer">
-                    <button id="sections-back-btn" class="sections-back-btn">Go Back</button>
-                </div>
+        <div id="sessionInfo" class="session-info hidden">
+            <h2 id="sessionName"></h2>
+            <div class="session-stats">
+                <span id="sessionDuration"></span>
+                <span id="searchCount"></span>
+                <span id="pageCount"></span>
+                <span id="noteCount"></span>
             </div>
         </div>
-        
-        <!-- Edit Metadata Modal -->
-        <div id="edit-modal" class="sections-modal">
-            <div class="sections-modal-content">
-                <div class="sections-modal-header">
-                    <h3>Edit Page Metadata</h3>
-                    <button id="edit-modal-close" class="sections-modal-close">×</button>
+
+        <div id="visualization" class="visualization hidden">
+            <div class="tabs">
+                <button class="tab-button active" data-tab="timeline">Timeline View</button>
+                <button class="tab-button" data-tab="statistics">Statistics</button>
+            </div>
+
+            <div id="timeline" class="tab-content active">
+                <div class="timeline-header">
+                    <div class="timeline-controls">
+                        <label>
+                            <input type="checkbox" id="showSearches" checked> Show Searches
+                        </label>
+                        <label>
+                            <input type="checkbox" id="showPages" checked> Show Pages
+                        </label>
+                        <label>
+                            <input type="checkbox" id="showNotes" checked> Show Notes
+                        </label>
+                        <label>
+                            <input type="checkbox" id="showFeedback" checked> Show Feedback
+                        </label>
+                    </div>
+                    <div class="timeline-actions">
+                        <button id="expandAll" class="expand-btn">Expand All</button>
+                        <button id="collapseAll" class="collapse-btn">Collapse All</button>
+                        <button id="exportFeedback" class="export-btn">Export Annotations</button>
+                        <button id="exportModified" class="export-btn">Export Modified Data</button>
+                        <button id="undoBtn" class="undo-btn" disabled>Undo</button>
+                        <button id="restorePages" class="restore-btn">Restore Removed Pages</button>
+                    </div>
                 </div>
-                <div class="sections-modal-body">
-                    <form id="edit-form">
-                        <div class="form-group">
-                            <label for="edit-title">Title:</label>
-                            <input type="text" id="edit-title" name="title">
-                        </div>
-                        <div class="form-group">
-                            <label for="edit-author">Author:</label>
-                            <input type="text" id="edit-author" name="author">
-                        </div>
-                        <div class="form-group">
-                            <label for="edit-publisher">Publisher:</label>
-                            <input type="text" id="edit-publisher" name="publisher">
-                        </div>
-                        <div class="form-group">
-                            <label for="edit-publishDate">Publish Date:</label>
-                            <input type="text" id="edit-publishDate" name="publishDate">
-                        </div>
-                        <div class="form-group">
-                            <label for="edit-description">Description:</label>
-                            <textarea id="edit-description" name="description" rows="3"></textarea>
-                        </div>
-                    </form>
-                </div>
-                <div class="sections-modal-footer">
-                    <button id="edit-save-btn" class="primary-button">Save Changes</button>
-                    <button id="edit-cancel-btn" class="sections-back-btn">Cancel</button>
-                </div>
+                <div class="research-summary" id="researchSummary"></div>
+                <div id="timelineContent"></div>
+            </div>
+
+            <div id="statistics" class="tab-content">
+                <div id="statsContent"></div>
             </div>
         </div>
-        
-        <!-- Add Note Modal -->
-        <div id="add-note-modal" class="sections-modal">
-            <div class="sections-modal-content">
-                <div class="sections-modal-header">
-                    <h3>Add Note</h3>
-                    <button id="add-note-modal-close" class="sections-modal-close">×</button>
-                </div>
-                <div class="sections-modal-body">
-                    <form id="add-note-form">
-                        <div class="form-group">
-                            <textarea id="note-content" name="content" rows="4" placeholder="Add your note here..." class="large-textarea"></textarea>
-                        </div>
-                    </form>
-                </div>
-                <div class="sections-modal-footer">
-                    <button id="note-save-btn" class="sections-back-btn">Add Note</button>
-                    <button id="note-cancel-btn" class="sections-back-btn">Cancel</button>
-                </div>
-            </div>
-        </div>
-    </main>
+    </div>
 
-    <footer>
-        <p>Research Tracker Visualizer | <a href="https://github.com/ant981228/research-tracker-visualizer" target="_blank">View on GitHub</a> | <a href="https://github.com/ant981228/research-tracker-extension" target="_blank">Download Extension</a></p>
-    </footer>
-
-    <!-- Scripts -->
-    <script src="js/dataProcessor.js"></script>
-    <script src="js/docProcessor.js"></script>
-    <script src="js/graphView.js"></script>
-    <script src="js/timelineView.js"></script>
-    <script src="js/rawView.js"></script>
-    <script src="js/main.js"></script>
+    <script src="visualizer.js"></script>
 </body>
 </html>
