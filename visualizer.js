@@ -1185,6 +1185,11 @@ function createPageItem(page, pageId, showNotes, showAnnotations) {
     icon.className = 'page-icon';
     icon.textContent = '📄';
     
+    const contentWrapper = document.createElement('div');
+    contentWrapper.style.display = 'flex';
+    contentWrapper.style.width = '100%';
+    contentWrapper.style.alignItems = 'center';
+    
     const content = document.createElement('div');
     content.className = 'page-content';
     
@@ -1375,7 +1380,7 @@ function createPageItem(page, pageId, showNotes, showAnnotations) {
         actionButtons.appendChild(removeBtn);
     }
     
-    content.appendChild(actionButtons);
+    // Don't append actionButtons to content anymore
     
     // Add annotations
     const annotation = annotationData[pageId];
@@ -1395,9 +1400,32 @@ function createPageItem(page, pageId, showNotes, showAnnotations) {
         }
     }
     
+    // Add content to wrapper
+    contentWrapper.appendChild(content);
+    contentWrapper.appendChild(actionButtons);
+    
+    // Check if content is too narrow and switch to vertical layout
+    const checkLayout = () => {
+        const contentWidth = content.offsetWidth;
+        if (contentWidth < 400) {
+            actionButtons.classList.add('vertical');
+        } else {
+            actionButtons.classList.remove('vertical');
+        }
+    };
+    
+    // Check layout after DOM updates
+    setTimeout(checkLayout, 0);
+    
+    // Add resize observer to check layout on size changes
+    if (window.ResizeObserver) {
+        const resizeObserver = new ResizeObserver(checkLayout);
+        resizeObserver.observe(content);
+    }
+    
     item.appendChild(time);
     item.appendChild(icon);
-    item.appendChild(content);
+    item.appendChild(contentWrapper);
     
     return item;
 }
