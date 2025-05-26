@@ -1493,6 +1493,9 @@ function enableUndoButton() {
                 case 'removeSearch':
                     undoBtn.textContent = 'Undo Remove Search';
                     break;
+                case 'unlinkCard':
+                    undoBtn.textContent = 'Undo Unlink';
+                    break;
                 default:
                     undoBtn.textContent = 'Undo';
             }
@@ -1576,6 +1579,31 @@ function performUndo() {
             saveRemovedSearches();
             if (sessionData && sessionData.id) {
                 localStorage.setItem(`removed-pages-${sessionData.id}`, JSON.stringify(Array.from(removedPages)));
+            }
+            break;
+            
+        case 'unlinkCard':
+            // Restore the unlinked card to all affected pages
+            lastAction.affectedPages.forEach(({page, pageId}) => {
+                if (!page.cards) {
+                    page.cards = [];
+                }
+                // Add the card back
+                page.cards.push(lastAction.card);
+                
+                // Sort cards by score again to maintain order
+                page.cards.sort((a, b) => b.matchScore - a.matchScore);
+            });
+            
+            // If the cards modal is open for the primary page, refresh it
+            const modal = document.getElementById('cardsModal');
+            if (modal && modal.style.display === 'block' && lastAction.primaryPageId) {
+                const primaryPage = lastAction.affectedPages.find(
+                    ap => ap.pageId === lastAction.primaryPageId
+                )?.page;
+                if (primaryPage) {
+                    showCardsModal(lastAction.primaryPageId, primaryPage);
+                }
             }
             break;
     }
@@ -2495,17 +2523,63 @@ function unlinkCard(pageId, cardIndexInPage) {
     }
     
     if (targetPage && targetPage.cards && targetPage.cards[cardIndexInPage]) {
-        // Remove the card
+        // Store the card data for undo
+        const removedCard = targetPage.cards[cardIndexInPage];
+        const affectedPages = [];
+        
+        // Remove the card from the target page
         targetPage.cards.splice(cardIndexInPage, 1);
+        affectedPages.push({
+            page: targetPage,
+            pageId: pageId
+        });
         
         // If this page shares a URL with other pages, update them too
         const pageUrl = targetPage.url;
-        sessionData.contentPages.forEach(page => {
+        sessionData.contentPages.forEach((page, idx) => {
             if (page !== targetPage && page.url === pageUrl && page.cards) {
-                // Remove the same card from pages with the same URL
-                page.cards = page.cards.filter((card, idx) => idx !== cardIndexInPage);
+                // Find and remove the same card from pages with the same URL
+                const cardIndex = page.cards.findIndex(c => 
+                    c.cardIndex === removedCard.cardIndex
+                );
+                if (cardIndex !== -1) {
+                    page.cards.splice(cardIndex, 1);
+                    
+                    // Determine the pageId for this page
+                    let thisPageId;
+                    if (!page.sourceSearch) {
+                        const orphanIndex = sessionData.contentPages.filter(p => !p.sourceSearch).indexOf(page);
+                        thisPageId = `orphan-${orphanIndex}`;
+                    } else {
+                        // Find this page in the grouped structure
+                        const groups = groupSearchesAndPages();
+                        for (let gIdx = 0; gIdx < groups.length; gIdx++) {
+                            const pIdx = groups[gIdx].pages.indexOf(page);
+                            if (pIdx !== -1) {
+                                thisPageId = `page-${gIdx}-${pIdx}`;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (thisPageId) {
+                        affectedPages.push({
+                            page: page,
+                            pageId: thisPageId
+                        });
+                    }
+                }
             }
         });
+        
+        // Track action for undo
+        lastAction = {
+            type: 'unlinkCard',
+            card: removedCard,
+            affectedPages: affectedPages,
+            primaryPageId: pageId
+        };
+        enableUndoButton();
         
         // Update the modal
         showCardsModal(pageId, targetPage);
