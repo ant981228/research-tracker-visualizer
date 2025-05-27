@@ -1251,6 +1251,11 @@ h1 {
     color: #7f8c8d;
 }
 
+.weighting-method {
+    color: #5a6c7d;
+    font-style: italic;
+}
+
 .card-content {
     color: #2c3e50;
     line-height: 1.6;

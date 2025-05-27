@@ -2683,12 +2683,17 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Function to calculate position-weighted match score
-function calculateMatchScore(text, searchTerms, positionWeight = true) {
+function calculateMatchScore(text, searchTerms, positionWeight = true, cutoffPosition = null) {
     if (!text || !searchTerms || searchTerms.length === 0) return 0;
     
-    const lowerText = text.toLowerCase();
+    // If cutoffPosition is provided, only consider text up to that position
+    const effectiveText = cutoffPosition !== null ? text.substring(0, cutoffPosition) : text;
+    const lowerText = effectiveText.toLowerCase();
     const textLength = lowerText.length;
     let totalScore = 0;
+    
+    // Split text into paragraphs for position weighting
+    const paragraphs = effectiveText.split(/\n\s*\n/).filter(p => p.trim().length > 0);
     
     searchTerms.forEach(term => {
         if (!term) return;
@@ -2699,10 +2704,34 @@ function calculateMatchScore(text, searchTerms, positionWeight = true) {
             // Base score for finding the term
             let score = 1;
             
-            if (positionWeight) {
-                // Weight based on position - earlier matches get higher scores
-                // Score decreases linearly from 2.0 at position 0 to 0.5 at end
-                const positionFactor = 2.0 - (1.5 * (position / textLength));
+            if (positionWeight && cutoffPosition === null) {
+                // Find which paragraph contains this match
+                let currentPos = 0;
+                let paragraphIndex = 0;
+                
+                for (let i = 0; i < paragraphs.length; i++) {
+                    const paraLength = paragraphs[i].length;
+                    if (position >= currentPos && position < currentPos + paraLength) {
+                        paragraphIndex = i;
+                        break;
+                    }
+                    currentPos += paraLength + 2; // +2 for paragraph break
+                }
+                
+                // Apply weighting based on paragraph number
+                let positionFactor = 1.0;
+                if (paragraphIndex < 3) {
+                    // First 3 paragraphs get full weight
+                    positionFactor = 1.0;
+                } else {
+                    // After paragraph 3, rapid exponential decay
+                    // Paragraph 4: factor ≈ 0.37
+                    // Paragraph 5: factor ≈ 0.14
+                    // Paragraph 6: factor ≈ 0.05
+                    const paragraphsAfter3 = paragraphIndex - 2;
+                    positionFactor = Math.exp(-paragraphsAfter3);
+                }
+                
                 score *= positionFactor;
             }
             
@@ -2732,8 +2761,16 @@ function matchCardsToPages() {
         const cardText = card.contentText;
         const cardHeader = card.header;
         
+        // Detect URL in card text - look for http:// or https://
+        const urlRegex = /https?:\/\/[^\s]+/;
+        const urlMatch = cardText.match(urlRegex);
+        const urlCutoffPosition = urlMatch ? urlMatch.index : null;
+        
         if (cardIndex === 0) {
             console.log('Sample card text (first 200 chars):', cardText.substring(0, 200));
+            if (urlCutoffPosition !== null) {
+                console.log('URL found at position:', urlCutoffPosition);
+            }
         }
         
         // Score each page
@@ -2744,7 +2781,8 @@ function matchCardsToPages() {
                 titleMatch: false,
                 authorMatch: false,
                 dateMatch: false,
-                publicationMatch: false
+                publicationMatch: false,
+                weightingMethod: urlCutoffPosition !== null ? 'URL cutoff' : 'Position-based'
             };
             
             // Get page metadata
@@ -2773,7 +2811,7 @@ function matchCardsToPages() {
             // Check URL match (highest priority)
             if (pageUrl) {
                 const urlParts = pageUrl.split(/[\/\-\._?#&=]/).filter(p => p.length > 3);
-                const urlScore = calculateMatchScore(cardText, urlParts);
+                const urlScore = calculateMatchScore(cardText, urlParts, true, urlCutoffPosition);
                 if (urlScore > 0) {
                     score += urlScore * 3; // Triple weight for URL matches
                     matchDetails.urlMatch = true;
@@ -2783,7 +2821,7 @@ function matchCardsToPages() {
             // Check title match (high priority)
             if (pageTitle) {
                 const titleWords = pageTitle.split(/\s+/).filter(w => w.length > 3);
-                const titleScore = calculateMatchScore(cardText, titleWords);
+                const titleScore = calculateMatchScore(cardText, titleWords, true, urlCutoffPosition);
                 if (titleScore > 0) {
                     score += titleScore * 2; // Double weight for title matches
                     matchDetails.titleMatch = true;
@@ -2793,7 +2831,7 @@ function matchCardsToPages() {
             // Check author match
             const allAuthors = [author, ...authors].filter(a => a);
             if (allAuthors.length > 0) {
-                const authorScore = calculateMatchScore(cardText, allAuthors);
+                const authorScore = calculateMatchScore(cardText, allAuthors, true, urlCutoffPosition);
                 if (authorScore > 0) {
                     score += authorScore;
                     matchDetails.authorMatch = true;
@@ -2807,7 +2845,7 @@ function matchCardsToPages() {
                     publishDate.replace(/-/g, '/'),
                     publishDate.replace(/-/g, ' ')
                 ];
-                const dateScore = calculateMatchScore(cardText, dateVariations);
+                const dateScore = calculateMatchScore(cardText, dateVariations, true, urlCutoffPosition);
                 if (dateScore > 0) {
                     score += dateScore;
                     matchDetails.dateMatch = true;
@@ -2817,7 +2855,7 @@ function matchCardsToPages() {
             // Check publication match (publisher or journal)
             const publications = [publisher, journal].filter(p => p);
             if (publications.length > 0) {
-                const pubScore = calculateMatchScore(cardText, publications);
+                const pubScore = calculateMatchScore(cardText, publications, true, urlCutoffPosition);
                 if (pubScore > 0) {
                     score += pubScore;
                     matchDetails.publicationMatch = true;
@@ -2923,8 +2961,8 @@ function matchCardsToPages() {
         if (page.cards && page.cards.length > 0) {
             const maxScore = Math.max(...page.cards.map(c => c.matchScore));
             
-            // If there's an extremely good match (>80), filter out weak matches
-            if (maxScore > 80) {
+            // If there's an extremely good match (>40), filter out weak matches
+            if (maxScore > 40) {
                 const threshold = maxScore * 0.7; // Keep only matches within 70% of the best
                 page.cards = page.cards.filter(card => card.matchScore >= threshold);
             }
@@ -3030,12 +3068,15 @@ function showCardsModal(pageId, page) {
         if (card.matchDetails.dateMatch) matchTypes.push('Date');
         if (card.matchDetails.publicationMatch) matchTypes.push('Publication');
         
+        const weightingMethod = card.matchDetails.weightingMethod || 'Unknown';
+        
         cardDiv.innerHTML = `
             <div class="card-header">
                 <h4>${card.header}</h4>
                 <div class="match-info">
                     <span class="match-score">Score: ${card.matchScore.toFixed(2)}</span>
                     <span class="match-types">Matched: ${matchTypes.join(', ')}</span>
+                    <span class="weighting-method">Method: ${weightingMethod}</span>
                     <button class="unlink-card-btn" onclick="unlinkCard('${pageId}', ${index})">Unlink</button>
                 </div>
             </div>
