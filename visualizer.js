@@ -427,11 +427,19 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('undoBtn').addEventListener('click', performUndo);
     document.getElementById('restorePages').addEventListener('click', restoreAllRemovedPages);
     
+    // Font selector buttons
+    document.querySelectorAll('.font-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            setFont(this.dataset.font);
+        });
+    });
+    
     // Load saved data from localStorage
     loadSavedAnnotations();
     loadRemovedPages();
     loadRemovedSearches();
     loadEditedMetadata();
+    loadSavedFont();
 });
 
 function handleFileUpload(event) {
@@ -771,6 +779,13 @@ function updateStatistics() {
     const eventsCard = createStatCard('Total Events', totalEvents, 'events');
     statsContent.appendChild(eventsCard);
     
+    // Average pages per search
+    const totalSearches = sessionData.searches.length;
+    const totalPages = sessionData.contentPages.length;
+    const avgPages = totalSearches > 0 ? (totalPages / totalSearches).toFixed(1) : 0;
+    const avgPagesCard = createStatCard('Average Pages per Search', avgPages, 'pages');
+    statsContent.appendChild(avgPagesCard);
+    
     // Search engines used
     const searchEngines = {};
     sessionData.searches.forEach(search => {
@@ -817,6 +832,10 @@ function updateStatistics() {
     
     domainsCard.appendChild(domainsList);
     statsContent.appendChild(domainsCard);
+    
+    // Source types pie chart
+    const sourceTypesCard = createSourceTypesChart();
+    statsContent.appendChild(sourceTypesCard);
 }
 
 function createStatCard(label, value, unit) {
@@ -834,6 +853,81 @@ function calculateDuration() {
     const startTime = new Date(sessionData.startTime);
     const endTime = new Date(sessionData.endTime);
     return Math.round((endTime - startTime) / 1000 / 60);
+}
+
+function createSourceTypesChart() {
+    // Count source types
+    const sourceTypes = {};
+    sessionData.contentPages.forEach(page => {
+        if (!shouldFilterPage(page)) {
+            const sourceType = assessSourceType(page);
+            const label = getSourceTypeLabel(sourceType);
+            sourceTypes[label] = (sourceTypes[label] || 0) + 1;
+        }
+    });
+    
+    // Create card
+    const card = document.createElement('div');
+    card.className = 'stat-card source-types-card';
+    card.innerHTML = '<h3>Source Types</h3>';
+    
+    if (Object.keys(sourceTypes).length === 0) {
+        card.innerHTML += '<p class="no-data">No source data available</p>';
+        return card;
+    }
+    
+    // Create pie chart container
+    const chartContainer = document.createElement('div');
+    chartContainer.className = 'pie-chart-container';
+    
+    const pieChart = document.createElement('div');
+    pieChart.className = 'pie-chart';
+    
+    const legend = document.createElement('div');
+    legend.className = 'chart-legend';
+    
+    // Calculate total and create pie chart using conic-gradient
+    const total = Object.values(sourceTypes).reduce((sum, count) => sum + count, 0);
+    
+    // Colors for different source types
+    const colors = [
+        '#d4edda', '#e7f3ff', '#d1ecf1', '#e2e3e5', '#e7e6f7', 
+        '#f0e6ff', '#ffeaa7', '#e6f4ea', '#e8f5e9', '#f5f5f5',
+        '#ffebee', '#fff3e0', '#e3f2fd', '#fafafa'
+    ];
+    
+    // Create conic-gradient string
+    let gradientParts = [];
+    let currentAngle = 0;
+    
+    Object.entries(sourceTypes).forEach(([type, count], index) => {
+        const percentage = (count / total) * 100;
+        const angle = (count / total) * 360;
+        const color = colors[index % colors.length];
+        
+        gradientParts.push(`${color} ${currentAngle}deg ${currentAngle + angle}deg`);
+        
+        // Create legend item
+        const legendItem = document.createElement('div');
+        legendItem.className = 'legend-item';
+        legendItem.innerHTML = `
+            <div class="legend-color" style="background-color: ${color}"></div>
+            <span class="legend-label">${type}</span>
+            <span class="legend-value">${count} (${percentage.toFixed(1)}%)</span>
+        `;
+        legend.appendChild(legendItem);
+        
+        currentAngle += angle;
+    });
+    
+    // Apply the complete conic-gradient to the pie chart
+    pieChart.style.background = `conic-gradient(${gradientParts.join(', ')})`;
+    
+    chartContainer.appendChild(pieChart);
+    chartContainer.appendChild(legend);
+    card.appendChild(chartContainer);
+    
+    return card;
 }
 
 function switchTab(event) {
@@ -2953,4 +3047,39 @@ function unlinkCard(pageId, cardIndexInPage) {
         // Update the timeline to reflect the change
         updateTimeline();
     }
+}
+
+// Font management functions
+function setFont(fontType) {
+    const root = document.documentElement;
+    
+    // Update CSS variable based on font type
+    switch(fontType) {
+        case 'sans-serif':
+            root.style.setProperty('--font-family', 'var(--font-sans-serif)');
+            break;
+        case 'serif':
+            root.style.setProperty('--font-family', 'var(--font-serif)');
+            break;
+        case 'monospace':
+            root.style.setProperty('--font-family', 'var(--font-monospace)');
+            break;
+        case 'dyslexia':
+            root.style.setProperty('--font-family', 'var(--font-dyslexia)');
+            break;
+        default:
+            root.style.setProperty('--font-family', 'var(--font-sans-serif)');
+    }
+    
+    // Update active button
+    document.querySelectorAll('.font-btn').forEach(btn => btn.classList.remove('active'));
+    document.querySelector(`[data-font="${fontType}"]`).classList.add('active');
+    
+    // Save preference
+    localStorage.setItem('selectedFont', fontType);
+}
+
+function loadSavedFont() {
+    const savedFont = localStorage.getItem('selectedFont') || 'sans-serif';
+    setFont(savedFont);
 }
