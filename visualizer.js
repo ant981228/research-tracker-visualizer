@@ -9,92 +9,369 @@ let editedMetadata = {}; // Store edited metadata
 // Sample data for demonstration
 const sampleData = {
     "id": "demo-session-001",
-    "name": "Climate Change Research Demo",
-    "startTime": "2025-05-18T19:30:45.123Z",
-    "endTime": "2025-05-18T20:45:12.456Z",
+    "name": "Sample Research Session",
+    "startTime": "2025-05-26T14:00:00.000Z",
+    "endTime": "2025-05-26T16:30:00.000Z",
     "searches": [
         {
             "type": "search",
             "engine": "GOOGLE",
             "domain": "google.com",
-            "query": "climate change impact sea levels",
-            "params": {
-                "q": "climate change impact sea levels",
-                "tbm": "nws"
-            },
-            "url": "https://www.google.com/search?q=climate+change+impact+sea+levels&tbm=nws",
-            "timestamp": "2025-05-18T19:31:02.789Z",
-            "tabId": 12345,
-            "notes": [
-                {
-                    "content": "Starting my research on sea level rise",
-                    "timestamp": "2025-05-18T19:31:15.123Z"
-                }
-            ]
+            "query": "climate change policy initiatives",
+            "url": "https://www.google.com/search?q=climate+change+policy+initiatives",
+            "timestamp": "2025-05-26T14:00:30.000Z",
+            "tabId": 12345
         },
         {
             "type": "search",
             "engine": "GOOGLE_SCHOLAR",
             "domain": "scholar.google.com",
-            "query": "antarctic ice sheet melting rate",
-            "params": {
-                "q": "antarctic ice sheet melting rate"
-            },
-            "url": "https://scholar.google.com/scholar?q=antarctic+ice+sheet+melting+rate",
-            "timestamp": "2025-05-18T19:45:30.456Z",
+            "query": "renewable energy peer review studies",
+            "url": "https://scholar.google.com/scholar?q=renewable+energy+peer+review+studies",
+            "timestamp": "2025-05-26T14:15:00.000Z",
             "tabId": 12346
+        },
+        {
+            "type": "search",
+            "engine": "GOOGLE",
+            "domain": "google.com",
+            "query": "IPCC report 2025 summary",
+            "url": "https://www.google.com/search?q=IPCC+report+2025+summary",
+            "timestamp": "2025-05-26T14:30:00.000Z",
+            "tabId": 12347
+        },
+        {
+            "type": "search",
+            "engine": "GOOGLE",
+            "domain": "google.com",
+            "query": "economic impact climate change developing nations",
+            "url": "https://www.google.com/search?q=economic+impact+climate+change+developing+nations",
+            "timestamp": "2025-05-26T15:00:00.000Z",
+            "tabId": 12348
         }
     ],
     "contentPages": [
+        // Government sources
         {
             "type": "pageVisit",
-            "url": "https://www.scientificamerican.com/article/sea-level-rise-projections/",
-            "title": "New Sea Level Rise Projections Alarm Scientists",
-            "timestamp": "2025-05-18T19:32:45.789Z",
-            "tabId": 12345,
+            "url": "https://www.epa.gov/climate-change/climate-change-impacts",
+            "title": "Climate Change Impacts | US EPA",
+            "timestamp": "2025-05-26T14:02:00.000Z",
             "sourceSearch": {
                 "engine": "GOOGLE",
-                "query": "climate change impact sea levels",
-                "url": "https://www.google.com/search?q=climate+change+impact+sea+levels&tbm=nws",
-                "timestamp": "2025-05-18T19:31:02.789Z"
+                "query": "climate change policy initiatives"
             },
             "metadata": {
-                "title": "New Sea Level Rise Projections Alarm Scientists",
-                "url": "https://www.scientificamerican.com/article/sea-level-rise-projections/",
-                "author": "Jane Smith",
-                "publishDate": "2025-05-10",
-                "description": "Recent studies show sea levels rising faster than previously predicted...",
-                "publisher": "Scientific American",
-                "quals": "PhD in Climate Science, MIT; Lead researcher at NOAA Climate Monitoring Division"
-            },
-            "notes": [
-                {
-                    "content": "Important data on acceleration of sea level rise - 3.4mm per year globally",
-                    "timestamp": "2025-05-18T19:35:12.456Z"
-                }
-            ]
+                "title": "Climate Change Impacts by Sector",
+                "publisher": "Environmental Protection Agency",
+                "publishDate": "2025-04-15",
+                "contentType": "report"
+            }
         },
         {
             "type": "pageVisit",
-            "url": "https://climate.nasa.gov/vital-signs/sea-level/",
-            "title": "Climate Change: Vital Signs of the Planet - Sea Level",
-            "timestamp": "2025-05-18T19:38:20.123Z",
-            "tabId": 12345,
+            "url": "https://www.noaa.gov/climate/2025-state-of-climate",
+            "title": "2025 State of the Climate Report | NOAA",
+            "timestamp": "2025-05-26T14:04:00.000Z",
             "sourceSearch": {
                 "engine": "GOOGLE",
-                "query": "climate change impact sea levels",
-                "url": "https://www.google.com/search?q=climate+change+impact+sea+levels&tbm=nws",
-                "timestamp": "2025-05-18T19:31:02.789Z"
+                "query": "climate change policy initiatives"
             },
             "metadata": {
-                "title": "Climate Change: Vital Signs of the Planet - Sea Level",
-                "url": "https://climate.nasa.gov/vital-signs/sea-level/",
-                "author": "NASA Climate Team",
-                "publisher": "NASA",
-                "publishDate": "2025-05-15",
-                "quals": "NASA Goddard Institute for Space Studies; Earth Science Division",
-                "journal": "NASA Climate Change and Global Warming",
-                "doi": "10.1234/nasa.climate.2025"
+                "title": "2025 State of the Climate",
+                "publisher": "National Oceanic and Atmospheric Administration",
+                "publishDate": "2025-05-01"
+            }
+        },
+        
+        // Journal articles
+        {
+            "type": "pageVisit",
+            "url": "https://www.nature.com/articles/s41558-025-01234-5",
+            "title": "Accelerating renewable energy transition in developing economies",
+            "timestamp": "2025-05-26T14:18:00.000Z",
+            "sourceSearch": {
+                "engine": "GOOGLE_SCHOLAR",
+                "query": "renewable energy peer review studies"
+            },
+            "metadata": {
+                "title": "Accelerating renewable energy transition in developing economies",
+                "authors": ["Chen, L.", "Smith, J.", "Kumar, P."],
+                "journal": "Nature Climate Change",
+                "publishDate": "2025-03-12",
+                "doi": "10.1038/s41558-025-01234-5",
+                "contentType": "journal-article"
+            }
+        },
+        {
+            "type": "pageVisit",
+            "url": "https://www.sciencedirect.com/science/article/pii/S0360544225001234",
+            "title": "Grid integration challenges for renewable energy systems",
+            "timestamp": "2025-05-26T14:20:00.000Z",
+            "sourceSearch": {
+                "engine": "GOOGLE_SCHOLAR",
+                "query": "renewable energy peer review studies"
+            },
+            "metadata": {
+                "title": "Grid integration challenges for renewable energy systems: A comprehensive review",
+                "authors": ["Johnson, M.", "Williams, K.", "Zhang, W."],
+                "journal": "Energy",
+                "publishDate": "2025-04-01",
+                "doi": "10.1016/j.energy.2025.01234",
+                "pmid": "38234567",
+                "contentType": "journal-article"
+            }
+        },
+        
+        // Preprints
+        {
+            "type": "pageVisit",
+            "url": "https://arxiv.org/abs/2505.12345",
+            "title": "Machine Learning Applications in Climate Modeling",
+            "timestamp": "2025-05-26T14:22:00.000Z",
+            "sourceSearch": {
+                "engine": "GOOGLE_SCHOLAR",
+                "query": "renewable energy peer review studies"
+            },
+            "metadata": {
+                "title": "Machine Learning Applications in Climate Modeling: A Systematic Approach",
+                "authors": ["Patel, R.", "Thompson, A."],
+                "publishDate": "2025-05-10",
+                "arxivId": "2505.12345",
+                "contentType": "preprint"
+            }
+        },
+        {
+            "type": "pageVisit",
+            "url": "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=4567890",
+            "title": "Economic Policy Responses to Climate Change",
+            "timestamp": "2025-05-26T15:05:00.000Z",
+            "sourceSearch": {
+                "engine": "GOOGLE",
+                "query": "economic impact climate change developing nations"
+            },
+            "metadata": {
+                "title": "Economic Policy Responses to Climate Change in Emerging Markets",
+                "author": "Martinez, C.",
+                "publishDate": "2025-05-20",
+                "doi": "10.2139/ssrn.4567890",
+                "contentType": "preprint"
+            }
+        },
+        
+        // Think tanks
+        {
+            "type": "pageVisit",
+            "url": "https://www.brookings.edu/articles/climate-policy-2025-outlook/",
+            "title": "Climate Policy in 2025: Global Outlook | Brookings",
+            "timestamp": "2025-05-26T14:06:00.000Z",
+            "sourceSearch": {
+                "engine": "GOOGLE",
+                "query": "climate change policy initiatives"
+            },
+            "metadata": {
+                "title": "Climate Policy in 2025: A Global Outlook",
+                "author": "Sarah Johnson",
+                "publisher": "Brookings Institution",
+                "publishDate": "2025-05-05"
+            }
+        },
+        {
+            "type": "pageVisit",
+            "url": "https://www.rand.org/pubs/research_reports/RRA2025-1.html",
+            "title": "National Security Implications of Climate Change",
+            "timestamp": "2025-05-26T14:08:00.000Z",
+            "sourceSearch": {
+                "engine": "GOOGLE",
+                "query": "climate change policy initiatives"
+            },
+            "metadata": {
+                "title": "National Security Implications of Climate Change: A 2025 Assessment",
+                "authors": ["Davis, M.", "Roberts, J."],
+                "publisher": "RAND Corporation",
+                "publishDate": "2025-04-20",
+                "contentType": "report"
+            }
+        },
+        
+        // News organizations
+        {
+            "type": "pageVisit",
+            "url": "https://www.nytimes.com/2025/05/15/climate/renewable-energy-milestone.html",
+            "title": "U.S. Reaches Historic Renewable Energy Milestone",
+            "timestamp": "2025-05-26T14:10:00.000Z",
+            "sourceSearch": {
+                "engine": "GOOGLE",
+                "query": "climate change policy initiatives"
+            },
+            "metadata": {
+                "title": "U.S. Reaches Historic Renewable Energy Milestone",
+                "author": "Lisa Chen",
+                "publisher": "The New York Times",
+                "publishDate": "2025-05-15"
+            }
+        },
+        {
+            "type": "pageVisit",
+            "url": "https://www.bbc.com/news/science-environment-67890123",
+            "title": "Climate summit agrees on new emissions targets",
+            "timestamp": "2025-05-26T14:32:00.000Z",
+            "sourceSearch": {
+                "engine": "GOOGLE",
+                "query": "IPCC report 2025 summary"
+            },
+            "metadata": {
+                "title": "Climate summit agrees on new emissions targets",
+                "publisher": "BBC News",
+                "publishDate": "2025-05-22"
+            }
+        },
+        
+        // Science media
+        {
+            "type": "pageVisit",
+            "url": "https://www.scientificamerican.com/article/climate-tipping-points-2025/",
+            "title": "Climate Tipping Points: What We Know in 2025",
+            "timestamp": "2025-05-26T14:35:00.000Z",
+            "sourceSearch": {
+                "engine": "GOOGLE",
+                "query": "IPCC report 2025 summary"
+            },
+            "metadata": {
+                "title": "Climate Tipping Points: What We Know in 2025",
+                "author": "Michael Brown",
+                "publisher": "Scientific American",
+                "publishDate": "2025-05-18"
+            }
+        },
+        
+        // Database
+        {
+            "type": "pageVisit",
+            "url": "https://www.jstor.org/stable/10.2307/48678901",
+            "title": "Historical Climate Data Analysis 1850-2025",
+            "timestamp": "2025-05-26T14:25:00.000Z",
+            "sourceSearch": {
+                "engine": "GOOGLE_SCHOLAR",
+                "query": "renewable energy peer review studies"
+            },
+            "metadata": {
+                "title": "Historical Climate Data Analysis 1850-2025",
+                "authors": ["Wilson, R.", "Garcia, M."],
+                "journal": "Journal of Climate History",
+                "publishDate": "2025-02-15",
+                "jstorId": "48678901"
+            }
+        },
+        
+        // University
+        {
+            "type": "pageVisit",
+            "url": "https://climate.mit.edu/research/renewable-energy-storage",
+            "title": "Renewable Energy Storage Solutions | MIT Climate",
+            "timestamp": "2025-05-26T14:28:00.000Z",
+            "sourceSearch": {
+                "engine": "GOOGLE_SCHOLAR",
+                "query": "renewable energy peer review studies"
+            },
+            "metadata": {
+                "title": "Advances in Renewable Energy Storage Solutions",
+                "publisher": "MIT Climate Portal",
+                "publishDate": "2025-04-30"
+            }
+        },
+        
+        // Encyclopedia
+        {
+            "type": "pageVisit",
+            "url": "https://www.britannica.com/science/climate-change-2025-update",
+            "title": "Climate Change | Britannica",
+            "timestamp": "2025-05-26T14:38:00.000Z",
+            "sourceSearch": {
+                "engine": "GOOGLE",
+                "query": "IPCC report 2025 summary"
+            },
+            "metadata": {
+                "title": "Climate Change - 2025 Update",
+                "publisher": "Encyclopedia Britannica",
+                "publishDate": "2025-05-01"
+            }
+        },
+        
+        // Wikipedia
+        {
+            "type": "pageVisit",
+            "url": "https://en.wikipedia.org/wiki/Paris_Agreement",
+            "title": "Paris Agreement - Wikipedia",
+            "timestamp": "2025-05-26T14:40:00.000Z",
+            "sourceSearch": {
+                "engine": "GOOGLE",
+                "query": "IPCC report 2025 summary"
+            },
+            "metadata": {
+                "title": "Paris Agreement",
+                "publisher": "Wikipedia"
+            }
+        },
+        
+        // Blog
+        {
+            "type": "pageVisit",
+            "url": "https://medium.com/@climateexpert/future-of-renewable-energy-2025",
+            "title": "The Future of Renewable Energy in 2025 and Beyond",
+            "timestamp": "2025-05-26T15:10:00.000Z",
+            "sourceSearch": {
+                "engine": "GOOGLE",
+                "query": "economic impact climate change developing nations"
+            },
+            "metadata": {
+                "title": "The Future of Renewable Energy in 2025 and Beyond",
+                "author": "Alex Thompson",
+                "publisher": "Medium",
+                "publishDate": "2025-05-10"
+            }
+        },
+        
+        // Social media
+        {
+            "type": "pageVisit",
+            "url": "https://twitter.com/UN/status/1234567890123456789",
+            "title": "UN Climate Action on X",
+            "timestamp": "2025-05-26T15:15:00.000Z",
+            "sourceSearch": {
+                "engine": "GOOGLE",
+                "query": "economic impact climate change developing nations"
+            },
+            "metadata": {
+                "title": "UN announces new climate fund for developing nations",
+                "publisher": "Twitter/X",
+                "publishDate": "2025-05-25"
+            }
+        },
+        
+        // Direct visits (orphaned pages)
+        {
+            "type": "pageVisit",
+            "url": "https://www.ipcc.ch/report/ar7/wg1/",
+            "title": "IPCC Seventh Assessment Report",
+            "timestamp": "2025-05-26T15:45:00.000Z",
+            "metadata": {
+                "title": "Climate Change 2025: The Physical Science Basis",
+                "publisher": "Intergovernmental Panel on Climate Change",
+                "publishDate": "2025-03-01",
+                "contentType": "report"
+            }
+        },
+        {
+            "type": "pageVisit",
+            "url": "https://www.worldbank.org/en/topic/climatechange/report/2025",
+            "title": "Climate Change Action Plan 2025-2030",
+            "timestamp": "2025-05-26T16:00:00.000Z",
+            "metadata": {
+                "title": "Climate Change Action Plan 2025-2030",
+                "publisher": "World Bank",
+                "publishDate": "2025-04-10",
+                "contentType": "report"
             }
         }
     ],
@@ -350,13 +627,13 @@ function createTimelineItem(event, index) {
         title.title = event.url; // Add URL as tooltip
         titleDiv.appendChild(title);
         
-        // Add source quality indicator for pages
+        // Add source type indicator for pages
         if (event.metadata && viewMode === 'teacher') {
-            const quality = assessSourceQuality(event);
-            const qualityBadge = document.createElement('span');
-            qualityBadge.className = `source-quality quality-${quality}`;
-            qualityBadge.textContent = quality.charAt(0).toUpperCase() + quality.slice(1);
-            titleDiv.appendChild(qualityBadge);
+            const sourceType = assessSourceType(event);
+            const typeBadge = document.createElement('span');
+            typeBadge.className = `source-type type-${sourceType}`;
+            typeBadge.textContent = getSourceTypeLabel(sourceType);
+            titleDiv.appendChild(typeBadge);
         }
         
         const details = document.createElement('div');
@@ -574,7 +851,7 @@ function switchTab(event) {
 }
 
 // Annotation functions
-function assessSourceQuality(page) {
+function assessSourceType(page) {
     const url = page.url.toLowerCase();
     let domain = new URL(page.url).hostname.toLowerCase();
     const metadata = page.metadata || {};
@@ -592,31 +869,38 @@ function assessSourceQuality(page) {
         return normalizedDomain.includes(normalizedPattern);
     };
     
-    // Check if we have academic identifiers (very strong signal)
-    if (metadata.doi || metadata.pmid || metadata.arxivId || metadata.jstorId) {
-        return 'excellent';
-    }
-    
-    // Check content type from metadata
+    // Check content type from metadata first
     if (metadata.contentType) {
-        if (['journal-article', 'preprint', 'academic-article', 'report'].includes(metadata.contentType)) {
-            return 'excellent';
-        }
+        if (metadata.contentType === 'journal-article') return 'journal';
+        if (metadata.contentType === 'preprint') return 'preprint';
+        if (metadata.contentType === 'report') return 'report';
     }
     
-    // Academic and government sources
+    // Check for specific academic identifiers
+    if (metadata.arxivId || domainMatches(domain, 'arxiv.org')) return 'preprint';
+    if (metadata.doi && domainMatches(domain, 'ssrn.com')) return 'preprint';
+    
+    // Government sources
     const normalizedDomain = domain.replace(/-/g, '.');
-    if (domain.endsWith('.edu') || domain.endsWith('.gov') || 
-        normalizedDomain.endsWith('.edu') || normalizedDomain.endsWith('.gov') ||
-        domainMatches(domain, 'scholar.google') || domainMatches(domain, 'jstor.org') ||
-        domainMatches(domain, 'pubmed') || domainMatches(domain, 'nature.com') ||
-        domainMatches(domain, 'sciencedirect.com') || domainMatches(domain, 'arxiv.org') ||
-        domainMatches(domain, 'doi.org') || domainMatches(domain, 'springer.com') ||
-        domainMatches(domain, 'wiley.com') || domainMatches(domain, 'elsevier.com') ||
-        domainMatches(domain, 'ncbi.nlm.nih.gov') || domainMatches(domain, 'nber.org') ||
-        domainMatches(domain, 'dukeupress.edu') || domainMatches(domain, 'ssrn.com') ||
-        domainMatches(domain, 'sagepub.com')) {
-        return 'excellent';
+    if (domain.endsWith('.gov') || normalizedDomain.endsWith('.gov')) {
+        return 'government';
+    }
+    
+    // Academic journals and publishers
+    if (metadata.doi || metadata.pmid || metadata.jstorId ||
+        domainMatches(domain, 'nature.com') || domainMatches(domain, 'sciencedirect.com') ||
+        domainMatches(domain, 'springer.com') || domainMatches(domain, 'wiley.com') ||
+        domainMatches(domain, 'elsevier.com') || domainMatches(domain, 'sagepub.com') ||
+        domainMatches(domain, 'tandfonline.com') || domainMatches(domain, 'cambridge.org') ||
+        domainMatches(domain, 'oxford.ac') || domainMatches(domain, 'oup.com') ||
+        domainMatches(domain, 'dukeupress.edu') || domainMatches(domain, 'doi.org')) {
+        return 'journal';
+    }
+    
+    // Research databases
+    if (domainMatches(domain, 'jstor.org') || domainMatches(domain, 'pubmed') ||
+        domainMatches(domain, 'ncbi.nlm.nih.gov') || domainMatches(domain, 'scholar.google')) {
+        return 'database';
     }
     
     // Think tanks and research organizations
@@ -632,52 +916,87 @@ function assessSourceQuality(page) {
         domainMatches(domain, 'cbpp.org') || domainMatches(domain, 'mercatus.org') ||
         domainMatches(domain, 'epi.org') || domainMatches(domain, 'milkeninstitute.org') ||
         domainMatches(domain, 'thirdway.org') || domainMatches(domain, 'cei.org') ||
-        domainMatches(domain, 'rstreet.org') || domainMatches(domain, 'aspeninstitute.org')) {
-        return 'excellent';
+        domainMatches(domain, 'rstreet.org') || domainMatches(domain, 'aspeninstitute.org') ||
+        domainMatches(domain, 'nber.org')) {
+        return 'thinktank';
     }
     
-    // Reputable news and organizations
+    // News organizations
     if (domain.includes('nytimes.com') || domain.includes('washingtonpost.com') ||
         domain.includes('bbc.com') || domain.includes('reuters.com') ||
         domain.includes('apnews.com') || domain.includes('npr.org') ||
-        domain.includes('scientificamerican.com') || domain.includes('theguardian.com') ||
-        domain.includes('wsj.com') || domain.includes('bloomberg.com') || 
-        domain.includes('cnn.com') || domain.includes('cnbc.com') ||
-        domain.includes('cbsnews.com') || domain.includes('abcnews.go.com') || 
-        domain.includes('nbcnews.com') || domain.includes('latimes.com') || 
-        domain.includes('theglobeandmail.com') || domain.includes('nypost.com') || 
-        domain.includes('usnews.com') || domain.includes('dw.com') || 
-        domain.includes('timesofindia.indiatimes.com') || domain.includes('indianexpress.com') || 
-        domain.includes('hindustantimes.com') || domain.includes('thehill.com') ||
-        domain.includes('thedailybeast.com') || domain.includes('newsweek.com') ||
-        domain.includes('bangkokpost.com') || domain.includes('japantimes.co.jp') ||
-        domain.includes('economist.com') || domain.includes('ft.com') || 
-        domain.includes('nationalreview.com')) {
-        return 'good';
+        domain.includes('theguardian.com') || domain.includes('wsj.com') || 
+        domain.includes('bloomberg.com') || domain.includes('cnn.com') || 
+        domain.includes('cnbc.com') || domain.includes('cbsnews.com') || 
+        domain.includes('abcnews.go.com') || domain.includes('nbcnews.com') || 
+        domain.includes('latimes.com') || domain.includes('theglobeandmail.com') || 
+        domain.includes('nypost.com') || domain.includes('usnews.com') || 
+        domain.includes('dw.com') || domain.includes('timesofindia.indiatimes.com') || 
+        domain.includes('indianexpress.com') || domain.includes('hindustantimes.com') || 
+        domain.includes('thehill.com') || domain.includes('thedailybeast.com') || 
+        domain.includes('newsweek.com') || domain.includes('bangkokpost.com') || 
+        domain.includes('japantimes.co.jp') || domain.includes('economist.com') || 
+        domain.includes('ft.com') || domain.includes('nationalreview.com')) {
+        return 'news';
+    }
+    
+    // Science media
+    if (domain.includes('scientificamerican.com') || domain.includes('sciencenews.org') ||
+        domain.includes('phys.org') || domain.includes('sciencedaily.com')) {
+        return 'science-media';
     }
     
     // Encyclopedia and reference sources
     if (domain.includes('britannica.com') || domain.includes('stanford.edu/entries')) {
-        return 'good';
+        return 'encyclopedia';
     }
     
-    // Social media and user-generated content
-    if (domain.includes('wikipedia.org') || domain.includes('reddit.com') ||
-        domain.includes('twitter.com') || domain.includes('x.com') ||
-        domain.includes('facebook.com') || domain.includes('youtube.com') ||
-        domain.includes('instagram.com') || domain.includes('tiktok.com')) {
-        return 'questionable';
+    // Wikipedia
+    if (domain.includes('wikipedia.org')) {
+        return 'wikipedia';
     }
     
-    // Blogs and personal sites (unless they have academic metadata)
-    if ((domain.includes('blogspot.com') || domain.includes('wordpress.com') ||
-         domain.includes('medium.com') || domain.includes('substack.com')) &&
-        !metadata.doi && !metadata.pmid) {
-        return 'questionable';
+    // Social media
+    if (domain.includes('reddit.com') || domain.includes('twitter.com') || 
+        domain.includes('x.com') || domain.includes('facebook.com') || 
+        domain.includes('youtube.com') || domain.includes('instagram.com') || 
+        domain.includes('tiktok.com')) {
+        return 'social';
+    }
+    
+    // Blogs
+    if (domain.includes('blogspot.com') || domain.includes('wordpress.com') ||
+        domain.includes('medium.com') || domain.includes('substack.com')) {
+        return 'blog';
+    }
+    
+    // University (general .edu that aren't journals or think tanks)
+    if (domain.endsWith('.edu') || normalizedDomain.endsWith('.edu')) {
+        return 'university';
     }
     
     // Default
-    return 'good';
+    return 'website';
+}
+
+function getSourceTypeLabel(type) {
+    const labels = {
+        'journal': 'Journal',
+        'preprint': 'Preprint',
+        'government': 'Government',
+        'thinktank': 'Think Tank',
+        'news': 'News',
+        'science-media': 'Science Media',
+        'encyclopedia': 'Encyclopedia',
+        'wikipedia': 'Wikipedia',
+        'database': 'Database',
+        'university': 'University',
+        'social': 'Social Media',
+        'blog': 'Blog',
+        'report': 'Report',
+        'website': 'Website'
+    };
+    return labels[type] || 'Website';
 }
 
 function createAnnotationDisplay(annotation, eventId) {
@@ -783,7 +1102,7 @@ function saveAnnotation(eventId, content, event) {
     annotationData[eventId] = {
         content: content.trim(),
         timestamp: new Date().toISOString(),
-        quality: event && event.type === 'pageVisit' ? assessSourceQuality(event) : null
+        sourceType: event && event.type === 'pageVisit' ? assessSourceType(event) : null
     };
     
     // Track action for undo
@@ -1221,13 +1540,13 @@ function createPageItem(page, pageId, showNotes, showAnnotations) {
     title.title = page.url; // Add URL as tooltip
     titleDiv.appendChild(title);
     
-    // Add source quality indicator
+    // Add source type indicator
     if (page.metadata && viewMode === 'teacher') {
-        const quality = assessSourceQuality(page);
-        const qualityBadge = document.createElement('span');
-        qualityBadge.className = `source-quality quality-${quality}`;
-        qualityBadge.textContent = quality.charAt(0).toUpperCase() + quality.slice(1);
-        titleDiv.appendChild(qualityBadge);
+        const sourceType = assessSourceType(page);
+        const typeBadge = document.createElement('span');
+        typeBadge.className = `source-type type-${sourceType}`;
+        typeBadge.textContent = getSourceTypeLabel(sourceType);
+        titleDiv.appendChild(typeBadge);
     }
     
     const details = document.createElement('div');
