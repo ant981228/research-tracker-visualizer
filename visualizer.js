@@ -2919,8 +2919,8 @@ function matchCardsToPages() {
         if (page.cards && page.cards.length > 0) {
             const maxScore = Math.max(...page.cards.map(c => c.matchScore));
             
-            // If there's an extremely good match (>80), filter out weak matches
-            if (maxScore > 80) {
+            // If there's an extremely good match (>70), filter out weak matches
+            if (maxScore > 70) {
                 const threshold = maxScore * 0.7; // Keep only matches within 70% of the best
                 page.cards = page.cards.filter(card => card.matchScore >= threshold);
             }
