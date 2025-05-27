@@ -2824,9 +2824,13 @@ function matchCardsToPages() {
                 }
             }
             
-            // Bonus if author + date + publication all match
+            // Strong bonuses for combinatorial matches
             if (matchDetails.authorMatch && matchDetails.dateMatch && matchDetails.publicationMatch) {
-                score += 2;
+                score += 15; // Large bonus for author + date + publication match
+            }
+            
+            if (matchDetails.urlMatch && matchDetails.titleMatch) {
+                score += 20; // Very large bonus for URL + title match
             }
             
             return {
@@ -2919,8 +2923,8 @@ function matchCardsToPages() {
         if (page.cards && page.cards.length > 0) {
             const maxScore = Math.max(...page.cards.map(c => c.matchScore));
             
-            // If there's an extremely good match (>70), filter out weak matches
-            if (maxScore > 70) {
+            // If there's an extremely good match (>80), filter out weak matches
+            if (maxScore > 80) {
                 const threshold = maxScore * 0.7; // Keep only matches within 70% of the best
                 page.cards = page.cards.filter(card => card.matchScore >= threshold);
             }
@@ -2982,6 +2986,15 @@ function showCardsModal(pageId, page) {
                 modal.style.display = 'none';
             }
         });
+        
+        // Escape key to close
+        const escapeHandler = function(e) {
+            if (e.key === 'Escape' && modal.style.display === 'block') {
+                modal.style.display = 'none';
+                document.removeEventListener('keydown', escapeHandler);
+            }
+        };
+        document.addEventListener('keydown', escapeHandler);
     }
     
     // Update modal content
@@ -3031,6 +3044,15 @@ function showCardsModal(pageId, page) {
         
         cardsContent.appendChild(cardDiv);
     });
+    
+    // Add escape key handler each time modal is shown
+    const escapeHandler = function(e) {
+        if (e.key === 'Escape') {
+            modal.style.display = 'none';
+            document.removeEventListener('keydown', escapeHandler);
+        }
+    };
+    document.addEventListener('keydown', escapeHandler);
     
     modal.style.display = 'block';
 }
