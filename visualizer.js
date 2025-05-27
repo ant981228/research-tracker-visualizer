@@ -838,8 +838,8 @@ function updateStatistics() {
     statsContent.appendChild(domainsCard);
     
     // Source types pie chart
-    // const sourceTypesCard = createSourceTypesChart();
-    // statsContent.appendChild(sourceTypesCard);
+    const sourceTypesCard = createSourceTypesChart();
+    statsContent.appendChild(sourceTypesCard);
 }
 
 function createStatCard(label, value, unit) {
@@ -859,20 +859,19 @@ function calculateDuration() {
     return Math.round((endTime - startTime) / 1000 / 60);
 }
 
-/*
 function createSourceTypesChart() {
     // Count source types
-    const sourceTypes = {};
-    sessionData.contentPages.forEach(page => {
+    var sourceTypes = {};
+    sessionData.contentPages.forEach(function(page) {
         if (!shouldFilterPage(page)) {
-            const sourceType = assessSourceType(page);
-            const label = getSourceTypeLabel(sourceType);
+            var sourceType = assessSourceType(page);
+            var label = getSourceTypeLabel(sourceType);
             sourceTypes[label] = (sourceTypes[label] || 0) + 1;
         }
     });
     
     // Create card
-    const card = document.createElement('div');
+    var card = document.createElement('div');
     card.className = 'stat-card source-types-card';
     card.innerHTML = '<h3>Source Types</h3>';
     
@@ -882,68 +881,72 @@ function createSourceTypesChart() {
     }
     
     // Create pie chart container
-    const chartContainer = document.createElement('div');
+    var chartContainer = document.createElement('div');
     chartContainer.className = 'pie-chart-container';
     
-    const pieChart = document.createElement('div');
+    var pieChart = document.createElement('div');
     pieChart.className = 'pie-chart';
     
-    const legend = document.createElement('div');
+    var legend = document.createElement('div');
     legend.className = 'chart-legend';
     
     // Calculate total and create pie chart using conic-gradient
-    const total = Object.values(sourceTypes).reduce((sum, count) => sum + count, 0);
+    var total = Object.keys(sourceTypes).reduce(function(sum, key) {
+        return sum + sourceTypes[key];
+    }, 0);
     
     // Vivid colors for different source types
-    const colors = [
+    var colors = [
         '#27ae60', '#3498db', '#e74c3c', '#f39c12', '#9b59b6',
         '#1abc9c', '#e67e22', '#2ecc71', '#34495e', '#f1c40f',
         '#e91e63', '#ff5722', '#607d8b', '#795548'
     ];
     
     // Create conic-gradient string
-    let gradientParts = [];
-    let currentAngle = 0;
+    var gradientParts = [];
+    var currentAngle = 0;
+    var index = 0;
     
-    Object.entries(sourceTypes).forEach(([type, count], index) => {
-        const percentage = (count / total) * 100;
-        const angle = (count / total) * 360;
-        const color = colors[index % colors.length];
+    Object.keys(sourceTypes).forEach(function(type) {
+        var count = sourceTypes[type];
+        var percentage = (count / total) * 100;
+        var angle = (count / total) * 360;
+        var color = colors[index % colors.length];
         
-        gradientParts.push(`${color} ${currentAngle}deg ${currentAngle + angle}deg`);
+        gradientParts.push(color + ' ' + currentAngle + 'deg ' + (currentAngle + angle) + 'deg');
         
         // Create legend item
-        const legendItem = document.createElement('div');
+        var legendItem = document.createElement('div');
         legendItem.className = 'legend-item';
-        legendItem.innerHTML = `
-            <div class="legend-color" style="background-color: ${color}"></div>
-            <span class="legend-label">${type}</span>
-            <span class="legend-value">${count} (${percentage.toFixed(1)}%)</span>
-        `;
+        legendItem.innerHTML = '<div class="legend-color" style="background-color: ' + color + '"></div>' +
+                              '<span class="legend-label">' + type + '</span>' +
+                              '<span class="legend-value">' + count + ' (' + percentage.toFixed(1) + '%)</span>';
         legend.appendChild(legendItem);
         
         currentAngle += angle;
+        index++;
     });
     
     // Apply the complete conic-gradient to the pie chart
-    pieChart.style.background = `conic-gradient(${gradientParts.join(', ')})`;
+    pieChart.style.background = 'conic-gradient(' + gradientParts.join(', ') + ')';
     
     // Add tooltip functionality
-    const tooltip = document.createElement('div');
+    var tooltip = document.createElement('div');
     tooltip.className = 'pie-tooltip';
     tooltip.style.display = 'none';
     card.appendChild(tooltip);
     
     // Store slice data for hover detection
-    const sliceData = [];
+    var sliceData = [];
     currentAngle = 0;
-    Object.entries(sourceTypes).forEach(([type, count]) => {
-        const percentage = (count / total) * 100;
-        const angle = (count / total) * 360;
+    Object.keys(sourceTypes).forEach(function(type) {
+        var count = sourceTypes[type];
+        var percentage = (count / total) * 100;
+        var angle = (count / total) * 360;
         sliceData.push({
-            type,
-            count,
-            percentage,
+            type: type,
+            count: count,
+            percentage: percentage,
             startAngle: currentAngle,
             endAngle: currentAngle + angle
         });
@@ -952,32 +955,34 @@ function createSourceTypesChart() {
     
     // Add mouse event listeners for tooltip
     pieChart.addEventListener('mousemove', function(e) {
-        const rect = pieChart.getBoundingClientRect();
-        const centerX = rect.width / 2;
-        const centerY = rect.height / 2;
-        const x = e.clientX - rect.left - centerX;
-        const y = e.clientY - rect.top - centerY;
+        var rect = pieChart.getBoundingClientRect();
+        var centerX = rect.width / 2;
+        var centerY = rect.height / 2;
+        var x = e.clientX - rect.left - centerX;
+        var y = e.clientY - rect.top - centerY;
         
         // Calculate angle from center
-        let angle = Math.atan2(y, x) * 180 / Math.PI;
+        var angle = Math.atan2(y, x) * 180 / Math.PI;
         if (angle < 0) angle += 360;
         // Adjust for CSS conic-gradient starting point (top)
         angle = (angle + 90) % 360;
         
         // Find which slice this angle belongs to
-        const hoveredSlice = sliceData.find(slice => 
-            angle >= slice.startAngle && angle < slice.endAngle
-        );
+        var hoveredSlice = null;
+        for (var i = 0; i < sliceData.length; i++) {
+            if (angle >= sliceData[i].startAngle && angle < sliceData[i].endAngle) {
+                hoveredSlice = sliceData[i];
+                break;
+            }
+        }
         
         if (hoveredSlice) {
-            const pageText = hoveredSlice.count === 1 ? 'page' : 'pages';
-            tooltip.innerHTML = `
-                <strong>${hoveredSlice.type}</strong><br>
-                ${hoveredSlice.count} ${pageText} (${hoveredSlice.percentage.toFixed(1)}%)
-            `;
+            var pageText = hoveredSlice.count === 1 ? 'page' : 'pages';
+            tooltip.innerHTML = '<strong>' + hoveredSlice.type + '</strong><br>' +
+                               hoveredSlice.count + ' ' + pageText + ' (' + hoveredSlice.percentage.toFixed(1) + '%)';
             tooltip.style.display = 'block';
-            tooltip.style.left = (e.pageX - 100) + 'px'; // Center tooltip horizontally on cursor
-            tooltip.style.top = (e.pageY - 50) + 'px'; // Position above cursor
+            tooltip.style.left = (e.pageX - 100) + 'px';
+            tooltip.style.top = (e.pageY - 50) + 'px';
         }
     });
     
@@ -991,7 +996,6 @@ function createSourceTypesChart() {
     
     return card;
 }
-*/
 
 function switchTab(event) {
     const targetTab = event.target.getAttribute('data-tab');
