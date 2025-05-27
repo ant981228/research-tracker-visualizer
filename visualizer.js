@@ -860,6 +860,9 @@ function calculateDuration() {
 }
 
 function createSourceTypesChart() {
+    console.log("createSourceTypesChart called");
+    console.log("contentPages length:", sessionData.contentPages ? sessionData.contentPages.length : "undefined");
+    
     // Count source types
     var sourceTypes = {};
     sessionData.contentPages.forEach(function(page) {
@@ -869,6 +872,9 @@ function createSourceTypesChart() {
             sourceTypes[label] = (sourceTypes[label] || 0) + 1;
         }
     });
+    
+    console.log("Source types found:", Object.keys(sourceTypes).length);
+    console.log("Source types object:", sourceTypes);
     
     // Create card
     var card = document.createElement('div');
