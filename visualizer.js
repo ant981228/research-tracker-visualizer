@@ -2795,12 +2795,18 @@ function showCardsModal(pageId, page) {
         modal.id = 'cardsModal';
         modal.className = 'modal';
         modal.innerHTML = `
-            <div class="modal-content">
+            <div class="modal-content cards-modal-content">
                 <div class="modal-header">
-                    <h3>Cards for: <span id="cardsPageTitle"></span></h3>
+                    <h3>Cards from: <span id="cardsPageTitle"></span></h3>
                     <button class="close-modal" onclick="document.getElementById('cardsModal').style.display='none'">&times;</button>
                 </div>
-                <div id="cardsContent"></div>
+                <div class="cards-modal-body">
+                    <nav class="cards-nav">
+                        <h4>Sections</h4>
+                        <ul id="cardsNavList"></ul>
+                    </nav>
+                    <div id="cardsContent" class="cards-content-area"></div>
+                </div>
             </div>
         `;
         document.body.appendChild(modal);
@@ -2823,9 +2829,20 @@ function showCardsModal(pageId, page) {
     // Sort cards by match score (highest first)
     const sortedCards = [...page.cards].sort((a, b) => b.matchScore - a.matchScore);
     
+    // Build navigation list
+    const navList = document.getElementById('cardsNavList');
+    navList.innerHTML = '';
+    
     sortedCards.forEach((card, index) => {
         const cardDiv = document.createElement('div');
         cardDiv.className = 'card-item';
+        cardDiv.id = `card-${index}`;
+        
+        // Add to navigation
+        const navItem = document.createElement('li');
+        navItem.className = 'cards-nav-item';
+        navItem.innerHTML = `<a href="#card-${index}" onclick="document.getElementById('card-${index}').scrollIntoView({behavior: 'smooth', block: 'start'}); return false;">${card.header}</a>`;
+        navList.appendChild(navItem);
         
         // Create match details string
         const matchTypes = [];

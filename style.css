@@ -1068,9 +1068,69 @@ h1 {
 }
 
 /* Cards modal styles */
-#cardsContent {
-    max-height: 60vh;
+.cards-modal-content {
+    width: 90%;
+    max-width: 1200px;
+    height: 80vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.cards-modal-body {
+    display: flex;
+    gap: 20px;
+    height: calc(100% - 60px);
+    overflow: hidden;
+}
+
+.cards-nav {
+    width: 250px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
     overflow-y: auto;
+    flex-shrink: 0;
+}
+
+.cards-nav h4 {
+    margin: 0 0 15px 0;
+    color: #2c3e50;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+#cardsNavList {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.cards-nav-item {
+    margin-bottom: 8px;
+}
+
+.cards-nav-item a {
+    display: block;
+    padding: 8px 12px;
+    color: #34495e;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: background-color 0.2s, color 0.2s;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cards-nav-item a:hover {
+    background-color: #e8f4f8;
+    color: #2980b9;
+}
+
+.cards-content-area {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 10px;
 }
 
 .card-item {
@@ -1079,6 +1139,7 @@ h1 {
     padding: 20px;
     margin-bottom: 20px;
     border-left: 4px solid #34495e;
+    scroll-margin-top: 20px;
 }
 
 .card-header h4 {
