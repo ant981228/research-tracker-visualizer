@@ -427,6 +427,9 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('undoBtn').addEventListener('click', performUndo);
     document.getElementById('restorePages').addEventListener('click', restoreAllRemovedPages);
     
+    // Sidebar toggle
+    document.getElementById('sidebarToggle').addEventListener('click', toggleSidebar);
+    
     // Font selector buttons
     document.querySelectorAll('.font-btn').forEach(function(button) {
         button.addEventListener('click', function() {
@@ -440,6 +443,7 @@ document.addEventListener('DOMContentLoaded', function() {
     loadRemovedSearches();
     loadEditedMetadata();
     loadSavedFont();
+    loadSavedSidebarState();
 });
 
 function handleFileUpload(event) {
@@ -3149,4 +3153,33 @@ function setFont(fontType) {
 function loadSavedFont() {
     const savedFont = localStorage.getItem('selectedFont') || 'sans-serif';
     setFont(savedFont);
+}
+
+// Sidebar toggle functions
+function toggleSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const toggleIcon = document.querySelector('.toggle-icon');
+    const isCollapsed = sidebar.classList.contains('collapsed');
+    
+    if (isCollapsed) {
+        sidebar.classList.remove('collapsed');
+        toggleIcon.textContent = '«';
+        localStorage.setItem('sidebarCollapsed', 'false');
+    } else {
+        sidebar.classList.add('collapsed');
+        toggleIcon.textContent = '»';
+        localStorage.setItem('sidebarCollapsed', 'true');
+    }
+}
+
+function loadSavedSidebarState() {
+    const isCollapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+    const toggleIcon = document.querySelector('.toggle-icon');
+    
+    if (isCollapsed) {
+        document.getElementById('sidebar').classList.add('collapsed');
+        toggleIcon.textContent = '»';
+    } else {
+        toggleIcon.textContent = '«';
+    }
 }
