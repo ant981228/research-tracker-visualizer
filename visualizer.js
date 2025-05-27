@@ -927,8 +927,53 @@ function createSourceTypesChart() {
         index++;
     });
     
-    // Apply the complete conic-gradient to the pie chart
-    pieChart.style.background = 'conic-gradient(' + gradientParts.join(', ') + ')';
+    // Create SVG pie chart for better compatibility
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('width', '196');
+    svg.setAttribute('height', '196');
+    svg.setAttribute('viewBox', '0 0 196 196');
+    
+    var radius = 90;
+    var centerX = 98;
+    var centerY = 98;
+    currentAngle = 0;
+    index = 0;
+    
+    Object.keys(sourceTypes).forEach(function(type) {
+        var count = sourceTypes[type];
+        var angle = (count / total) * 360;
+        var color = colors[index % colors.length];
+        
+        if (angle > 0) {
+            var startAngleRad = (currentAngle - 90) * Math.PI / 180;
+            var endAngleRad = (currentAngle + angle - 90) * Math.PI / 180;
+            
+            var x1 = centerX + radius * Math.cos(startAngleRad);
+            var y1 = centerY + radius * Math.sin(startAngleRad);
+            var x2 = centerX + radius * Math.cos(endAngleRad);
+            var y2 = centerY + radius * Math.sin(endAngleRad);
+            
+            var largeArcFlag = angle > 180 ? 1 : 0;
+            
+            var pathData = 'M ' + centerX + ' ' + centerY + 
+                          ' L ' + x1 + ' ' + y1 + 
+                          ' A ' + radius + ' ' + radius + ' 0 ' + largeArcFlag + ' 1 ' + x2 + ' ' + y2 + 
+                          ' Z';
+            
+            var path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            path.setAttribute('d', pathData);
+            path.setAttribute('fill', color);
+            path.setAttribute('stroke', '#fff');
+            path.setAttribute('stroke-width', '2');
+            
+            svg.appendChild(path);
+        }
+        
+        currentAngle += angle;
+        index++;
+    });
+    
+    pieChart.appendChild(svg);
     
     // Add tooltip functionality
     var tooltip = document.createElement('div');
@@ -964,7 +1009,7 @@ function createSourceTypesChart() {
         // Calculate angle from center
         var angle = Math.atan2(y, x) * 180 / Math.PI;
         if (angle < 0) angle += 360;
-        // Adjust for CSS conic-gradient starting point (top)
+        // Adjust for SVG starting point (top)
         angle = (angle + 90) % 360;
         
         // Find which slice this angle belongs to
