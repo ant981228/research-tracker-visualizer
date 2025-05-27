@@ -405,7 +405,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('loadSample').addEventListener('click', loadSampleData);
     
     // Tab switching
-    document.querySelectorAll('.tab-button').forEach(button => {
+    document.querySelectorAll('.tab-button').forEach(function(button) {
         button.addEventListener('click', switchTab);
     });
     
@@ -428,7 +428,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('restorePages').addEventListener('click', restoreAllRemovedPages);
     
     // Font selector buttons
-    document.querySelectorAll('.font-btn').forEach(button => {
+    document.querySelectorAll('.font-btn').forEach(function(button) {
         button.addEventListener('click', function() {
             setFont(this.dataset.font);
         });
@@ -466,10 +466,9 @@ function loadSampleData() {
     
     sessionData = sampleData;
     // Build chronological events from searches and pages
-    sessionData.chronologicalEvents = [
-        ...sessionData.searches,
-        ...sessionData.contentPages
-    ].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    sessionData.chronologicalEvents = sessionData.searches.concat(sessionData.contentPages).sort(function(a, b) {
+        return new Date(a.timestamp) - new Date(b.timestamp);
+    });
     
     processSessionData();
 }
@@ -2985,7 +2984,7 @@ function showCardsModal(pageId, page) {
     cardsContent.innerHTML = '';
     
     // Sort cards by match score (highest first)
-    const sortedCards = [...page.cards].sort((a, b) => b.matchScore - a.matchScore);
+    const sortedCards = page.cards.slice().sort(function(a, b) { return b.matchScore - a.matchScore; });
     
     // Build navigation list
     const navList = document.getElementById('cardsNavList');
