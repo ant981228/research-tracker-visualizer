@@ -839,8 +839,8 @@ function updateStatistics() {
     statsContent.appendChild(domainsCard);
     
     // Source types pie chart
-    const sourceTypesCard = createSourceTypesChart();
-    statsContent.appendChild(sourceTypesCard);
+    // const sourceTypesCard = createSourceTypesChart();
+    // statsContent.appendChild(sourceTypesCard);
 }
 
 function createStatCard(label, value, unit) {
@@ -860,6 +860,7 @@ function calculateDuration() {
     return Math.round((endTime - startTime) / 1000 / 60);
 }
 
+/*
 function createSourceTypesChart() {
     // Count source types
     const sourceTypes = {};
@@ -991,6 +992,7 @@ function createSourceTypesChart() {
     
     return card;
 }
+*/
 
 function switchTab(event) {
     const targetTab = event.target.getAttribute('data-tab');
