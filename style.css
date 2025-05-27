@@ -1312,6 +1312,8 @@ h1 {
     border-radius: 50%;
     border: 2px solid #dee2e6;
     flex-shrink: 0;
+    cursor: pointer;
+    position: relative;
 }
 
 .chart-legend {
@@ -1353,3 +1355,19 @@ h1 {
     font-style: italic;
     margin-top: 10px;
 }
+
+.pie-tooltip {
+    position: fixed;
+    background-color: #2c3e50;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    line-height: 1.4;
+    pointer-events: none;
+    z-index: 1000;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    max-width: 200px;
+    text-align: center;
+}
+

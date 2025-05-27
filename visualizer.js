@@ -459,6 +459,11 @@ function handleFileUpload(event) {
 }
 
 function loadSampleData() {
+    // Clear file input when loading sample data
+    const fileInput = document.getElementById('fileInput');
+    fileInput.value = '';
+    document.getElementById('fileInputName').textContent = 'No JSON file chosen';
+    
     sessionData = sampleData;
     // Build chronological events from searches and pages
     sessionData.chronologicalEvents = [
@@ -889,11 +894,11 @@ function createSourceTypesChart() {
     // Calculate total and create pie chart using conic-gradient
     const total = Object.values(sourceTypes).reduce((sum, count) => sum + count, 0);
     
-    // Colors for different source types
+    // Vivid colors for different source types
     const colors = [
-        '#d4edda', '#e7f3ff', '#d1ecf1', '#e2e3e5', '#e7e6f7', 
-        '#f0e6ff', '#ffeaa7', '#e6f4ea', '#e8f5e9', '#f5f5f5',
-        '#ffebee', '#fff3e0', '#e3f2fd', '#fafafa'
+        '#27ae60', '#3498db', '#e74c3c', '#f39c12', '#9b59b6',
+        '#1abc9c', '#e67e22', '#2ecc71', '#34495e', '#f1c40f',
+        '#e91e63', '#ff5722', '#607d8b', '#795548'
     ];
     
     // Create conic-gradient string
@@ -922,6 +927,63 @@ function createSourceTypesChart() {
     
     // Apply the complete conic-gradient to the pie chart
     pieChart.style.background = `conic-gradient(${gradientParts.join(', ')})`;
+    
+    // Add tooltip functionality
+    const tooltip = document.createElement('div');
+    tooltip.className = 'pie-tooltip';
+    tooltip.style.display = 'none';
+    card.appendChild(tooltip);
+    
+    // Store slice data for hover detection
+    const sliceData = [];
+    currentAngle = 0;
+    Object.entries(sourceTypes).forEach(([type, count]) => {
+        const percentage = (count / total) * 100;
+        const angle = (count / total) * 360;
+        sliceData.push({
+            type,
+            count,
+            percentage,
+            startAngle: currentAngle,
+            endAngle: currentAngle + angle
+        });
+        currentAngle += angle;
+    });
+    
+    // Add mouse event listeners for tooltip
+    pieChart.addEventListener('mousemove', function(e) {
+        const rect = pieChart.getBoundingClientRect();
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        const x = e.clientX - rect.left - centerX;
+        const y = e.clientY - rect.top - centerY;
+        
+        // Calculate angle from center
+        let angle = Math.atan2(y, x) * 180 / Math.PI;
+        if (angle < 0) angle += 360;
+        // Adjust for CSS conic-gradient starting point (top)
+        angle = (angle + 90) % 360;
+        
+        // Find which slice this angle belongs to
+        const hoveredSlice = sliceData.find(slice => 
+            angle >= slice.startAngle && angle < slice.endAngle
+        );
+        
+        if (hoveredSlice) {
+            const pageText = hoveredSlice.count === 1 ? 'page' : 'pages';
+            tooltip.innerHTML = `
+                <strong>${hoveredSlice.type}</strong><br>
+                ${hoveredSlice.count} ${pageText} (${hoveredSlice.percentage.toFixed(1)}%)
+            `;
+            tooltip.style.display = 'block';
+            tooltip.style.left = (e.pageX - 100) + 'px'; // Center tooltip horizontally on cursor
+            tooltip.style.top = (e.pageY - 50) + 'px'; // Position above cursor
+        }
+    });
+    
+    pieChart.addEventListener('mouseleave', function() {
+        tooltip.style.display = 'none';
+    });
     
     chartContainer.appendChild(pieChart);
     chartContainer.appendChild(legend);
