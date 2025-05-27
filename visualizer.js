@@ -411,6 +411,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Timeline filters
     document.getElementById('showPages').addEventListener('change', updateTimeline);
+    document.getElementById('showMetadata').addEventListener('change', updateTimeline);
     document.getElementById('showNotes').addEventListener('change', updateTimeline);
     document.getElementById('showAnnotations').addEventListener('change', updateTimeline);
     
@@ -511,6 +512,7 @@ function updateSessionInfo() {
 
 function updateTimeline() {
     const showPages = document.getElementById('showPages').checked;
+    const showMetadata = document.getElementById('showMetadata').checked;
     const showNotes = document.getElementById('showNotes').checked;
     const showAnnotations = document.getElementById('showAnnotations').checked;
     
@@ -522,7 +524,7 @@ function updateTimeline() {
     
     // Create timeline items for each search group
     searchGroups.forEach((group, groupIndex) => {
-        const searchContainer = createSearchContainer(group, groupIndex, showPages, showNotes, showAnnotations);
+        const searchContainer = createSearchContainer(group, groupIndex, showPages, showNotes, showAnnotations, showMetadata);
         timelineContent.appendChild(searchContainer);
     });
     
@@ -546,7 +548,7 @@ function updateTimeline() {
         orphanContainer.appendChild(orphanHeader);
         
         orphanedPagesFiltered.forEach(({ page, pageId }) => {
-            const pageItem = createPageItem(page, pageId, showNotes, showAnnotations);
+            const pageItem = createPageItem(page, pageId, showNotes, showAnnotations, showMetadata);
             orphanContainer.appendChild(pageItem);
         });
         
@@ -1374,7 +1376,7 @@ function groupSearchesAndPages() {
     return groups;
 }
 
-function createSearchContainer(group, groupIndex, showPages, showNotes, showAnnotations) {
+function createSearchContainer(group, groupIndex, showPages, showNotes, showAnnotations, showMetadata) {
     const container = document.createElement('div');
     container.className = 'search-group';
     container.dataset.groupIndex = groupIndex;
@@ -1481,7 +1483,7 @@ function createSearchContainer(group, groupIndex, showPages, showNotes, showAnno
         group.pages.forEach((page, pageIndex) => {
             const pageId = `page-${groupIndex}-${pageIndex}`;
             if (!removedPages.has(pageId)) {
-                const pageItem = createPageItem(page, pageId, showNotes, showAnnotations);
+                const pageItem = createPageItem(page, pageId, showNotes, showAnnotations, showMetadata);
                 pagesContainer.appendChild(pageItem);
             }
         });
@@ -1492,7 +1494,7 @@ function createSearchContainer(group, groupIndex, showPages, showNotes, showAnno
     return container;
 }
 
-function createPageItem(page, pageId, showNotes, showAnnotations) {
+function createPageItem(page, pageId, showNotes, showAnnotations, showMetadata) {
     const item = document.createElement('div');
     item.className = 'page-item';
     
@@ -1561,7 +1563,7 @@ function createPageItem(page, pageId, showNotes, showAnnotations) {
     const hasOriginalMetadata = page.metadata && Object.keys(page.metadata).length > 0;
     const hasEditedMetadata = edited && Object.keys(edited).length > 0;
     
-    if (hasOriginalMetadata || hasEditedMetadata) {
+    if (showMetadata && (hasOriginalMetadata || hasEditedMetadata)) {
         const metadataSection = document.createElement('div');
         metadataSection.className = 'metadata-section';
         
