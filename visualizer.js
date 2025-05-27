@@ -771,17 +771,21 @@ function formatTime(timestamp) {
 
 
 function updateStatistics() {
+    console.log("updateStatistics called");
     const statsContent = document.getElementById('statsContent');
+    console.log("statsContent element:", statsContent);
     statsContent.innerHTML = '';
     
     // Session duration
     const durationCard = createStatCard('Session Duration', calculateDuration(), 'minutes');
     statsContent.appendChild(durationCard);
+    console.log("Session duration card added");
     
     // Total events
     const totalEvents = sessionData.chronologicalEvents.length;
     const eventsCard = createStatCard('Total Events', totalEvents, 'events');
     statsContent.appendChild(eventsCard);
+    console.log("Total events card added");
     
     // Average pages per search
     const totalSearches = sessionData.searches.length;
@@ -789,6 +793,7 @@ function updateStatistics() {
     const avgPages = totalSearches > 0 ? (totalPages / totalSearches).toFixed(1) : 0;
     const avgPagesCard = createStatCard('Average Pages per Search', avgPages, 'pages');
     statsContent.appendChild(avgPagesCard);
+    console.log("Average pages card added, calling createSourceTypesChart next");
     
     // Search engines used
     const searchEngines = {};
@@ -838,8 +843,11 @@ function updateStatistics() {
     statsContent.appendChild(domainsCard);
     
     // Source types pie chart
+    console.log("About to call createSourceTypesChart");
     const sourceTypesCard = createSourceTypesChart();
+    console.log("createSourceTypesChart returned:", sourceTypesCard);
     statsContent.appendChild(sourceTypesCard);
+    console.log("Source types card appended to statsContent");
 }
 
 function createStatCard(label, value, unit) {
