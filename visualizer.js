@@ -788,9 +788,20 @@ function updateStatistics() {
     statsContent.appendChild(eventsCard);
     
     // Average pages per search
-    const totalSearches = sessionData.searches.length;
-    const totalPages = sessionData.contentPages.length;
-    const avgPages = totalSearches > 0 ? (totalPages / totalSearches).toFixed(1) : 0;
+    // Group searches by query and engine to deduplicate
+    const searchGroups = new Map();
+    sessionData.searches.forEach(search => {
+        const key = `${search.engine}-${search.query}`;
+        if (!searchGroups.has(key)) {
+            searchGroups.set(key, true);
+        }
+    });
+    const totalUniqueSearches = searchGroups.size;
+    
+    // Count only pages associated with searches (exclude direct visits)
+    const pagesFromSearches = sessionData.contentPages.filter(page => page.sourceSearch).length;
+    
+    const avgPages = totalUniqueSearches > 0 ? (pagesFromSearches / totalUniqueSearches).toFixed(1) : 0;
     const avgPagesCard = createStatCard('Average Pages per Search', avgPages, 'pages');
     statsContent.appendChild(avgPagesCard);
     
