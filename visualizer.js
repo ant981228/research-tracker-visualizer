@@ -1125,7 +1125,8 @@ function assessSourceType(page) {
         domain.includes('thehill.com') || domain.includes('thedailybeast.com') || 
         domain.includes('newsweek.com') || domain.includes('bangkokpost.com') || 
         domain.includes('japantimes.co.jp') || domain.includes('economist.com') || 
-        domain.includes('ft.com') || domain.includes('nationalreview.com')) {
+        domain.includes('ft.com') || domain.includes('nationalreview.com') || 
+        domain.includes('vox.com')) {
         return 'news';
     }
     
