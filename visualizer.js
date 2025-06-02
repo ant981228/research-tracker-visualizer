@@ -798,8 +798,19 @@ function updateStatistics() {
     });
     const totalUniqueSearches = searchGroups.size;
     
-    // Count only pages associated with searches (exclude direct visits)
-    const pagesFromSearches = sessionData.contentPages.filter(page => page.sourceSearch).length;
+    // Count only pages associated with searches (exclude direct visits, filtered pages, and removed pages)
+    const groups = groupSearchesAndPages();
+    let pagesFromSearches = 0;
+    
+    // Count pages from search groups that aren't filtered or removed
+    groups.forEach((group, groupIndex) => {
+        group.pages.forEach((page, pageIndex) => {
+            const pageId = `page-${groupIndex}-${pageIndex}`;
+            if (!removedPages.has(pageId)) {
+                pagesFromSearches++;
+            }
+        });
+    });
     
     const avgPages = totalUniqueSearches > 0 ? (pagesFromSearches / totalUniqueSearches).toFixed(1) : 0;
     const avgPagesCard = createStatCard('Average Pages per Search', avgPages, 'pages');
