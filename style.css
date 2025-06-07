@@ -511,10 +511,20 @@ h1 {
     position: relative;
 }
 
+.page-title-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
 .page-title {
     font-weight: 500;
     color: #2c3e50;
     cursor: help;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
 }
 
 .page-details {

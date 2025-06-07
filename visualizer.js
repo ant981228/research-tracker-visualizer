@@ -1703,6 +1703,7 @@ function createPageItem(page, pageId, showNotes, showAnnotations, showMetadata) 
     content.className = 'page-content';
     
     const titleDiv = document.createElement('div');
+    titleDiv.className = 'page-title-container';
     const title = document.createElement('span');
     title.className = 'page-title';
     
