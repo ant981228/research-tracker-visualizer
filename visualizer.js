@@ -2185,6 +2185,15 @@ function restoreAllRemovedPages() {
 }
 
 function showMetadataForm(pageId, page, buttonElement) {
+    const modal = document.getElementById('metadataModal');
+    const formContainer = document.getElementById('metadataFormContainer');
+    
+    // Clear existing content
+    formContainer.innerHTML = '';
+    
+    // Store escape handler for cleanup
+    let escapeHandler;
+    
     const form = document.createElement('div');
     form.className = 'metadata-form';
     
@@ -2357,15 +2366,16 @@ function showMetadataForm(pageId, page, buttonElement) {
         });
         
         saveMetadata(pageId, newMetadata, page);
-        form.remove();
+        modal.style.display = 'none';
+        document.removeEventListener('keydown', escapeHandler);
     };
     
     const cancelBtn = document.createElement('button');
     cancelBtn.className = 'cancel-metadata-btn';
     cancelBtn.textContent = 'Cancel';
     cancelBtn.onclick = () => {
-        form.remove();
-        updateTimeline();
+        modal.style.display = 'none';
+        document.removeEventListener('keydown', escapeHandler);
     };
     
     actions.appendChild(saveBtn);
@@ -2390,8 +2400,18 @@ function showMetadataForm(pageId, page, buttonElement) {
         form.appendChild(infoDiv);
     }
     
-    // Replace button with form
-    buttonElement.replaceWith(form);
+    // Add form to modal and show it
+    formContainer.appendChild(form);
+    modal.style.display = 'block';
+    
+    // ESC key to close modal
+    escapeHandler = function(e) {
+        if (e.key === 'Escape' && modal.style.display === 'block') {
+            modal.style.display = 'none';
+            document.removeEventListener('keydown', escapeHandler);
+        }
+    };
+    document.addEventListener('keydown', escapeHandler);
 }
 
 function saveMetadata(pageId, metadata, page) {
@@ -2693,13 +2713,25 @@ document.addEventListener('DOMContentLoaded', function() {
         showParsedSectionsModal();
     });
     
-    // Modal close button
-    document.querySelector('.close-modal').addEventListener('click', function() {
-        document.getElementById('sectionsModal').style.display = 'none';
+    // Modal close buttons
+    document.querySelectorAll('.close-modal').forEach(function(button) {
+        button.addEventListener('click', function() {
+            // Find the closest modal and close it
+            const modal = this.closest('.modal');
+            if (modal) {
+                modal.style.display = 'none';
+            }
+        });
     });
     
     // Click outside modal to close
     document.getElementById('sectionsModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            this.style.display = 'none';
+        }
+    });
+    
+    document.getElementById('metadataModal').addEventListener('click', function(e) {
         if (e.target === this) {
             this.style.display = 'none';
         }

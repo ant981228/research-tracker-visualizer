@@ -1164,6 +1164,26 @@ h1 {
     margin-left: 60px;
 }
 
+/* Metadata modal styles */
+.metadata-modal-content {
+    width: 90%;
+    max-width: 800px;
+    max-height: 85vh;
+}
+
+.metadata-form-container {
+    padding: 0;
+}
+
+/* Override metadata-form styles when in modal */
+.metadata-modal-content .metadata-form {
+    padding: 0;
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+    margin-top: 0;
+}
+
 /* Cards modal styles */
 .cards-modal-content {
     width: 90%;
