@@ -815,7 +815,7 @@ h1 {
     border-top: 1px solid #eee;
 }
 
-.teacher-annotation {
+.teacher-comment {
     margin-top: 10px;
     
     padding: 15px;
@@ -824,24 +824,24 @@ h1 {
     border-left: 4px solid #f39c12;
 }
 
-.annotation-header {
+.comment-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 10px;
 }
 
-.annotation-label {
+.comment-label {
     font-weight: 600;
     color: #856404;
 }
 
-.annotation-content {
+.comment-content {
     color: #856404;
     line-height: 1.6;
 }
 
-.add-annotation-btn {
+.add-comment-btn {
     padding: 6px 12px;
     background-color: #f39c12;
     color: white;
@@ -854,11 +854,11 @@ h1 {
     display: inline-block;
 }
 
-.add-annotation-btn:hover {
+.add-comment-btn:hover {
     background-color: #e67e22;
 }
 
-.edit-annotation-btn, .delete-annotation-btn {
+.edit-comment-btn, .delete-comment-btn {
     padding: 8px 15px;
     color: white;
     border: none;
@@ -867,23 +867,23 @@ h1 {
     font-size: 14px;
 }
 
-.edit-annotation-btn {
+.edit-comment-btn {
     background-color: #34495e;
 }
 
-.edit-annotation-btn:hover {
+.edit-comment-btn:hover {
     background-color: #2980b9;
 }
 
-.delete-annotation-btn {
+.delete-comment-btn {
     background-color: #e74c3c;
 }
 
-.delete-annotation-btn:hover {
+.delete-comment-btn:hover {
     background-color: #c0392b;
 }
 
-.annotation-form {
+.comment-form {
     margin-top: 10px;
     
     padding: 15px;
@@ -892,7 +892,7 @@ h1 {
     border: 1px solid #ddd;
 }
 
-.annotation-textarea {
+.comment-textarea {
     width: 100%;
     min-height: 100px;
     padding: 10px;
@@ -902,13 +902,13 @@ h1 {
     resize: vertical;
 }
 
-.annotation-actions {
+.comment-actions {
     display: flex;
     gap: 10px;
     margin-top: 10px;
 }
 
-.save-annotation-btn, .cancel-annotation-btn {
+.save-comment-btn, .cancel-comment-btn {
     padding: 8px 15px;
     border: none;
     border-radius: 5px;
@@ -916,12 +916,12 @@ h1 {
     font-size: 14px;
 }
 
-.save-annotation-btn {
+.save-comment-btn {
     background-color: #27ae60;
     color: white;
 }
 
-.cancel-annotation-btn {
+.cancel-comment-btn {
     background-color: #95a5a6;
     color: white;
 }
@@ -1561,5 +1561,64 @@ h1 {
 
 .close-doi-modal:hover {
     color: #2c3e50;
+}
+
+.doi-status {
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 14px;
+    line-height: 1.4;
+    text-align: center;
+}
+
+.doi-status.loading {
+    background-color: #e3f2fd;
+    color: #1976d2;
+    border: 1px solid #bbdefb;
+}
+
+.doi-status.success {
+    background-color: #e8f5e8;
+    color: #2e7d32;
+    border: 1px solid #c8e6c9;
+}
+
+.doi-status.error {
+    background-color: #ffebee;
+    color: #c62828;
+    border: 1px solid #ffcdd2;
+}
+
+/* Text truncation and expansion */
+.expandable-text {
+    display: inline;
+}
+
+.expand-text-btn {
+    background: none;
+    border: none;
+    color: #666;
+    cursor: pointer;
+    font-size: 0.9em;
+    text-decoration: underline;
+    padding: 0;
+    margin: 0 0 0 4px;
+    font-family: inherit;
+}
+
+.expand-text-btn:hover {
+    color: #333;
+    text-decoration: none;
+}
+
+.expand-text-btn:focus {
+    outline: 1px dotted #007bff;
+    outline-offset: 2px;
+}
+
+.non-text-content {
+    color: #666;
+    font-style: italic;
+    font-size: 0.9em;
 }
 

@@ -1,6 +1,6 @@
 let sessionData = null;
 let viewMode = 'teacher'; // Always teacher view
-let annotationData = {};
+let commentData = {};
 let removedPages = new Set();
 let removedSearches = new Set(); // Store removed searches
 let lastAction = null; // For undo functionality
@@ -413,10 +413,10 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('showPages').addEventListener('change', updateTimeline);
     document.getElementById('showMetadata').addEventListener('change', updateTimeline);
     document.getElementById('showNotes').addEventListener('change', updateTimeline);
-    document.getElementById('showAnnotations').addEventListener('change', updateTimeline);
+    document.getElementById('showComments').addEventListener('change', updateTimeline);
     
     // Export buttons
-    document.getElementById('exportAnnotations').addEventListener('click', exportAnnotations);
+    document.getElementById('exportComments').addEventListener('click', exportComments);
     document.getElementById('exportModified').addEventListener('click', exportModifiedData);
     
     // Expand/Collapse buttons
@@ -438,7 +438,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     // Load saved data from localStorage
-    loadSavedAnnotations();
+    loadSavedComments();
     loadRemovedPages();
     loadRemovedSearches();
     loadEditedMetadata();
@@ -483,11 +483,17 @@ function processSessionData() {
     // Clear previous session data
     removedPages.clear();
     removedSearches.clear();
-    annotationData = {};
+    commentData = {};
     editedMetadata = {};
     
-    // Load saved data for this session
-    loadSavedAnnotations();
+    // Load teacher comments from imported JSON if available
+    if (sessionData.teacherComments) {
+        commentData = { ...sessionData.teacherComments };
+        console.log('Loaded teacher comments from JSON:', Object.keys(commentData).length, 'comments');
+    }
+    
+    // Load saved data for this session (this will override JSON comments if localStorage has newer data)
+    loadSavedComments();
     loadRemovedPages();
     loadRemovedSearches();
     loadEditedMetadata();
@@ -530,7 +536,7 @@ function updateTimeline() {
     const showPages = document.getElementById('showPages').checked;
     const showMetadata = document.getElementById('showMetadata').checked;
     const showNotes = document.getElementById('showNotes').checked;
-    const showAnnotations = document.getElementById('showAnnotations').checked;
+    const showComments = document.getElementById('showComments').checked;
     
     const timelineContent = document.getElementById('timelineContent');
     timelineContent.innerHTML = '';
@@ -540,7 +546,7 @@ function updateTimeline() {
     
     // Create timeline items for each search group
     searchGroups.forEach((group, groupIndex) => {
-        const searchContainer = createSearchContainer(group, groupIndex, showPages, showNotes, showAnnotations, showMetadata);
+        const searchContainer = createSearchContainer(group, groupIndex, showPages, showNotes, showComments, showMetadata);
         timelineContent.appendChild(searchContainer);
     });
     
@@ -564,7 +570,7 @@ function updateTimeline() {
         orphanContainer.appendChild(orphanHeader);
         
         orphanedPagesFiltered.forEach(({ page, pageId }) => {
-            const pageItem = createPageItem(page, pageId, showNotes, showAnnotations, showMetadata);
+            const pageItem = createPageItem(page, pageId, showNotes, showComments, showMetadata);
             orphanContainer.appendChild(pageItem);
         });
         
@@ -578,11 +584,11 @@ function createTimelineItem(event, index) {
     item.dataset.eventIndex = index;
     
     const eventId = `${event.type}-${index}`;
-    const annotation = annotationData[eventId];
+    const comment = commentData[eventId];
     
-    if (annotation) {
-        item.classList.add('has-annotation');
-        if (annotation.quality === 'excellent') {
+    if (comment) {
+        item.classList.add('has-comment');
+        if (comment.quality === 'excellent') {
             item.classList.add('excellent-source');
         }
     }
@@ -618,7 +624,7 @@ function createTimelineItem(event, index) {
             event.notes.forEach(note => {
                 const noteDiv = document.createElement('div');
                 noteDiv.className = 'event-note';
-                noteDiv.textContent = `Student note: ${note.content}`;
+                noteDiv.textContent = `Note: ${note.content}`;
                 content.appendChild(noteDiv);
             });
         }
@@ -720,7 +726,7 @@ function createTimelineItem(event, index) {
             event.notes.forEach(note => {
                 const noteDiv = document.createElement('div');
                 noteDiv.className = 'event-note';
-                noteDiv.textContent = `Student note: ${note.content}`;
+                noteDiv.textContent = `Note: ${note.content}`;
                 content.appendChild(noteDiv);
             });
         }
@@ -740,20 +746,20 @@ function createTimelineItem(event, index) {
         content.appendChild(noteContent);
     }
     
-    // Add annotation section
-    const showAnnotations = document.getElementById('showAnnotations').checked;
-    if (showAnnotations && (viewMode === 'teacher' || annotation)) {
-        if (annotation) {
-            const annotationDiv = createAnnotationDisplay(annotation, eventId);
-            content.appendChild(annotationDiv);
+    // Add comment section
+    const showComments = document.getElementById('showComments').checked;
+    if (showComments && (viewMode === 'teacher' || comment)) {
+        if (comment) {
+            const commentDiv = createCommentDisplay(comment, eventId);
+            content.appendChild(commentDiv);
         }
         
-        if (viewMode === 'teacher' && !annotation) {
-            const addAnnotationBtn = document.createElement('button');
-            addAnnotationBtn.className = 'add-annotation-btn';
-            addAnnotationBtn.textContent = 'Add Annotation';
-            addAnnotationBtn.onclick = () => showAnnotationForm(eventId, event);
-            content.appendChild(addAnnotationBtn);
+        if (viewMode === 'teacher' && !comment) {
+            const addCommentBtn = document.createElement('button');
+            addCommentBtn.className = 'add-comment-btn';
+            addCommentBtn.textContent = 'Add Comment';
+            addCommentBtn.onclick = () => showCommentForm(eventId, event);
+            content.appendChild(addCommentBtn);
         }
     }
     
@@ -1039,7 +1045,95 @@ function switchTab(event) {
     document.getElementById(targetTab).classList.add('active');
 }
 
-// Annotation functions
+// Text utility functions
+function isTextContent(content) {
+    if (!content || typeof content !== 'string') {
+        return false;
+    }
+    
+    // Check if content looks like image data
+    if (content.startsWith('data:image/') || content.startsWith('data:video/') || 
+        content.startsWith('data:audio/') || content.startsWith('data:application/pdf')) {
+        return false;
+    }
+    
+    // Check if content is mostly binary data (has many non-printable characters)
+    const printableRegex = /[\x20-\x7E\s]/;
+    const printableChars = content.split('').filter(char => printableRegex.test(char)).length;
+    const printableRatio = printableChars / content.length;
+    
+    return printableRatio > 0.8; // At least 80% printable characters
+}
+
+function truncateText(text, maxLength = 150) {
+    if (!text || typeof text !== 'string') {
+        return '';
+    }
+    
+    // Only show text content
+    if (!isTextContent(text)) {
+        return '[Non-text content]';
+    }
+    
+    if (text.length <= maxLength) {
+        return text;
+    }
+    
+    // Try to truncate at word boundary
+    const truncated = text.substring(0, maxLength);
+    const lastSpace = truncated.lastIndexOf(' ');
+    
+    if (lastSpace > maxLength * 0.8) {
+        return truncated.substring(0, lastSpace) + '...';
+    }
+    
+    return truncated + '...';
+}
+
+function createExpandableText(text, maxLength = 150) {
+    if (!text || typeof text !== 'string') {
+        return document.createTextNode('');
+    }
+    
+    if (!isTextContent(text)) {
+        const span = document.createElement('span');
+        span.textContent = '[Non-text content]';
+        span.className = 'non-text-content';
+        return span;
+    }
+    
+    if (text.length <= maxLength) {
+        return document.createTextNode(text);
+    }
+    
+    const container = document.createElement('span');
+    container.className = 'expandable-text';
+    
+    const truncated = truncateText(text, maxLength);
+    const truncatedSpan = document.createElement('span');
+    truncatedSpan.textContent = truncated;
+    
+    const expandBtn = document.createElement('button');
+    expandBtn.className = 'expand-text-btn';
+    expandBtn.textContent = 'Show more';
+    expandBtn.onclick = function() {
+        if (truncatedSpan.textContent === truncated) {
+            truncatedSpan.textContent = text;
+            expandBtn.textContent = 'Show less';
+        } else {
+            truncatedSpan.textContent = truncated;
+            expandBtn.textContent = 'Show more';
+        }
+    };
+    
+    container.appendChild(truncatedSpan);
+    container.appendChild(document.createTextNode(' '));
+    container.appendChild(expandBtn);
+    
+    return container;
+}
+
+// Comment functions
 function assessSourceType(page) {
     const url = page.url.toLowerCase();
     let domain = new URL(page.url).hostname.toLowerCase();
@@ -1189,16 +1283,16 @@ function getSourceTypeLabel(type) {
     return labels[type] || 'Website';
 }
 
-function createAnnotationDisplay(annotation, eventId) {
-    const annotationDiv = document.createElement('div');
-    annotationDiv.className = 'teacher-annotation';
+function createCommentDisplay(comment, eventId) {
+    const commentDiv = document.createElement('div');
+    commentDiv.className = 'teacher-comment';
     
     const header = document.createElement('div');
-    header.className = 'annotation-header';
+    header.className = 'comment-header';
     
     const label = document.createElement('div');
-    label.className = 'annotation-label';
-    label.textContent = 'Annotation:';
+    label.className = 'comment-label';
+    label.textContent = 'Comment:';
     header.appendChild(label);
     
     if (viewMode === 'teacher') {
@@ -1207,14 +1301,14 @@ function createAnnotationDisplay(annotation, eventId) {
         buttonContainer.style.gap = '10px';
         
         const editBtn = document.createElement('button');
-        editBtn.className = 'edit-annotation-btn';
+        editBtn.className = 'edit-comment-btn';
         editBtn.textContent = 'Edit';
-        editBtn.onclick = function() { showAnnotationForm(eventId, null, annotation, this); };
+        editBtn.onclick = function() { showCommentForm(eventId, null, comment, this); };
         
         const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'delete-annotation-btn';
+        deleteBtn.className = 'delete-comment-btn';
         deleteBtn.textContent = 'Delete';
-        deleteBtn.onclick = () => deleteAnnotation(eventId);
+        deleteBtn.onclick = () => deleteComment(eventId);
         
         buttonContainer.appendChild(editBtn);
         buttonContainer.appendChild(deleteBtn);
@@ -1222,37 +1316,43 @@ function createAnnotationDisplay(annotation, eventId) {
     }
     
     const content = document.createElement('div');
-    content.className = 'annotation-content';
-    content.textContent = annotation.content;
+    content.className = 'comment-content';
     
-    annotationDiv.appendChild(header);
-    annotationDiv.appendChild(content);
+    const commentElement = createExpandableText(comment.content, 150);
+    if (commentElement.nodeType === Node.TEXT_NODE) {
+        content.textContent = comment.content;
+    } else {
+        content.appendChild(commentElement);
+    }
     
-    return annotationDiv;
+    commentDiv.appendChild(header);
+    commentDiv.appendChild(content);
+    
+    return commentDiv;
 }
 
-function showAnnotationForm(eventId, event, existingAnnotation = null, buttonElement = null) {
+function showCommentForm(eventId, event, existingComment = null, buttonElement = null) {
     const form = document.createElement('div');
-    form.className = 'annotation-form';
-    form.id = `annotation-form-${eventId}`;
+    form.className = 'comment-form';
+    form.id = `comment-form-${eventId}`;
     
     const textarea = document.createElement('textarea');
-    textarea.className = 'annotation-textarea';
-    textarea.placeholder = 'Enter your annotation here...';
-    if (existingAnnotation) {
-        textarea.value = existingAnnotation.content;
+    textarea.className = 'comment-textarea';
+    textarea.placeholder = 'Enter your comment here...';
+    if (existingComment) {
+        textarea.value = existingComment.content;
     }
     
     const actions = document.createElement('div');
-    actions.className = 'annotation-actions';
+    actions.className = 'comment-actions';
     
     const saveBtn = document.createElement('button');
-    saveBtn.className = 'save-annotation-btn';
-    saveBtn.textContent = 'Save Annotation';
-    saveBtn.onclick = () => saveAnnotation(eventId, textarea.value, event);
+    saveBtn.className = 'save-comment-btn';
+    saveBtn.textContent = 'Save Comment';
+    saveBtn.onclick = () => saveComment(eventId, textarea.value, event);
     
     const cancelBtn = document.createElement('button');
-    cancelBtn.className = 'cancel-annotation-btn';
+    cancelBtn.className = 'cancel-comment-btn';
     cancelBtn.textContent = 'Cancel';
     cancelBtn.onclick = () => {
         form.remove();
@@ -1267,11 +1367,11 @@ function showAnnotationForm(eventId, event, existingAnnotation = null, buttonEle
     
     // If we have a button element reference, use it directly
     if (buttonElement) {
-        if (existingAnnotation) {
-            // For edit button, replace the parent annotation div
-            const annotationDiv = buttonElement.closest('.teacher-annotation');
-            if (annotationDiv) {
-                annotationDiv.replaceWith(form);
+        if (existingComment) {
+            // For edit button, replace the parent comment div
+            const commentDiv = buttonElement.closest('.teacher-comment');
+            if (commentDiv) {
+                commentDiv.replaceWith(form);
             }
         } else {
             // For add button, replace the button itself
@@ -1283,13 +1383,13 @@ function showAnnotationForm(eventId, event, existingAnnotation = null, buttonEle
     }
 }
 
-function saveAnnotation(eventId, content, event) {
+function saveComment(eventId, content, event) {
     if (!content.trim()) return;
     
     // Save previous state for undo
-    const previousAnnotation = annotationData[eventId] ? { ...annotationData[eventId] } : null;
+    const previousComment = commentData[eventId] ? { ...commentData[eventId] } : null;
     
-    annotationData[eventId] = {
+    commentData[eventId] = {
         content: content.trim(),
         timestamp: new Date().toISOString(),
         sourceType: event && event.type === 'pageVisit' ? assessSourceType(event) : null
@@ -1297,46 +1397,51 @@ function saveAnnotation(eventId, content, event) {
     
     // Track action for undo
     lastAction = {
-        type: 'annotation',
+        type: 'comment',
         eventId: eventId,
-        previousValue: previousAnnotation,
-        newValue: { ...annotationData[eventId] }
+        previousValue: previousComment,
+        newValue: { ...commentData[eventId] }
     };
     enableUndoButton();
     
     // Save to localStorage
-    localStorage.setItem(`annotations-${sessionData.id}`, JSON.stringify(annotationData));
+    localStorage.setItem(`comments-${sessionData.id}`, JSON.stringify(commentData));
     
     // Refresh timeline
     updateTimeline();
 }
 
-function loadSavedAnnotations() {
+function loadSavedComments() {
     if (sessionData && sessionData.id) {
-        const saved = localStorage.getItem(`annotations-${sessionData.id}`);
+        const saved = localStorage.getItem(`comments-${sessionData.id}`);
         if (saved) {
-            annotationData = JSON.parse(saved);
+            const savedComments = JSON.parse(saved);
+            // Merge saved comments with imported comments, prioritizing localStorage
+            commentData = { ...commentData, ...savedComments };
+            console.log('Merged localStorage comments with imported comments');
+        } else if (Object.keys(commentData).length > 0) {
+            console.log('Using imported comments from JSON file');
         }
     }
 }
 
-function deleteAnnotation(eventId) {
-    if (confirm('Are you sure you want to delete this annotation?')) {
+function deleteComment(eventId) {
+    if (confirm('Are you sure you want to delete this comment?')) {
         // Save previous state for undo
-        const previousAnnotation = annotationData[eventId] ? { ...annotationData[eventId] } : null;
+        const previousComment = commentData[eventId] ? { ...commentData[eventId] } : null;
         
-        delete annotationData[eventId];
+        delete commentData[eventId];
         
         // Track action for undo
         lastAction = {
-            type: 'deleteAnnotation',
+            type: 'deleteComment',
             eventId: eventId,
-            previousValue: previousAnnotation
+            previousValue: previousComment
         };
         enableUndoButton();
         
         // Save to localStorage
-        localStorage.setItem(`annotations-${sessionData.id}`, JSON.stringify(annotationData));
+        localStorage.setItem(`comments-${sessionData.id}`, JSON.stringify(commentData));
         
         // Refresh timeline
         updateTimeline();
@@ -1345,13 +1450,13 @@ function deleteAnnotation(eventId) {
 
 // Research summary function removed - no longer needed
 
-function exportAnnotations() {
-    if (!sessionData || Object.keys(annotationData).length === 0) {
-        alert('No annotations to export');
+function exportComments() {
+    if (!sessionData || Object.keys(commentData).length === 0) {
+        alert('No comments to export');
         return;
     }
     
-    let textContent = `RESEARCH ANNOTATIONS\n`;
+    let textContent = `RESEARCH COMMENTS\n`;
     textContent += `Session: ${sessionData.name}\n`;
     textContent += `Student: ${sessionData.studentName || 'Unknown Student'}\n`;
     textContent += `Export Date: ${new Date().toLocaleString()}\n`;
@@ -1363,36 +1468,36 @@ function exportAnnotations() {
     const searchGroups = groupSearchesAndPages();
     searchGroups.forEach((group, groupIndex) => {
         const searchId = `search-group-${groupIndex}`;
-        const hasSearchAnnotation = annotationData[searchId];
+        const hasSearchComment = commentData[searchId];
         
-        // Check if any pages in this group have annotations
-        const pagesWithAnnotations = [];
+        // Check if any pages in this group have comments
+        const pagesWithComments = [];
         group.pages.forEach((page, pageIndex) => {
             const pageId = `page-${groupIndex}-${pageIndex}`;
-            if (annotationData[pageId]) {
-                pagesWithAnnotations.push({ page, pageId, pageIndex });
+            if (commentData[pageId]) {
+                pagesWithComments.push({ page, pageId, pageIndex });
             }
         });
         
-        // Only output if there are annotations for this search or its pages
-        if (hasSearchAnnotation || pagesWithAnnotations.length > 0) {
+        // Only output if there are comments for this search or its pages
+        if (hasSearchComment || pagesWithComments.length > 0) {
             entryCount++;
             textContent += `\nSEARCH #${entryCount}\n`;
             textContent += `Query: "${group.query}" on ${group.engine}\n`;
             textContent += `Time: ${new Date(group.firstTimestamp).toLocaleString()}\n`;
             
-            if (hasSearchAnnotation) {
-                textContent += `\nSEARCH ANNOTATION:\n${annotationData[searchId].content}\n`;
+            if (hasSearchComment) {
+                textContent += `\nSEARCH COMMENT:\n${commentData[searchId].content}\n`;
             }
             
-            // Add associated pages with annotations
-            if (pagesWithAnnotations.length > 0) {
-                textContent += `\nASSOCIATED PAGES WITH ANNOTATIONS:\n`;
-                pagesWithAnnotations.forEach(({ page, pageId }, idx) => {
+            // Add associated pages with comments
+            if (pagesWithComments.length > 0) {
+                textContent += `\nASSOCIATED PAGES WITH COMMENTS:\n`;
+                pagesWithComments.forEach(({ page, pageId }, idx) => {
                     textContent += `\n  Page ${idx + 1}: ${page.title || 'Untitled Page'}\n`;
                     textContent += `  URL: ${page.url}\n`;
                     textContent += `  Time: ${new Date(page.timestamp).toLocaleString()}\n`;
-                    textContent += `  ANNOTATION: ${annotationData[pageId].content}\n`;
+                    textContent += `  COMMENT: ${commentData[pageId].content}\n`;
                 });
             }
             
@@ -1402,15 +1507,15 @@ function exportAnnotations() {
     
     // Process orphaned pages (pages without a source search)
     const orphanedPages = sessionData.contentPages.filter(page => !page.sourceSearch);
-    let hasOrphanedAnnotations = false;
+    let hasOrphanedComments = false;
     
     orphanedPages.forEach((page, index) => {
         const orphanId = `page-orphan-${index}`;
-        if (annotationData[orphanId]) {
-            if (!hasOrphanedAnnotations) {
+        if (commentData[orphanId]) {
+            if (!hasOrphanedComments) {
                 textContent += `\nDIRECT PAGE VISITS (No Associated Search)\n`;
                 textContent += `${'='.repeat(40)}\n`;
-                hasOrphanedAnnotations = true;
+                hasOrphanedComments = true;
             }
             
             entryCount++;
@@ -1418,13 +1523,13 @@ function exportAnnotations() {
             textContent += `Title: ${page.title || 'Untitled Page'}\n`;
             textContent += `URL: ${page.url}\n`;
             textContent += `Time: ${new Date(page.timestamp).toLocaleString()}\n`;
-            textContent += `\nANNOTATION:\n${annotationData[orphanId].content}\n`;
+            textContent += `\nCOMMENT:\n${commentData[orphanId].content}\n`;
             textContent += `\n${'-'.repeat(60)}\n`;
         }
     });
     
     if (entryCount === 0) {
-        textContent += `\nNo annotations found.\n`;
+        textContent += `\nNo comments found.\n`;
     }
     
     // Create and download the text file
@@ -1432,7 +1537,7 @@ function exportAnnotations() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `annotations-${sessionData.name.replace(/[^a-z0-9]/gi, '_')}-${new Date().toISOString().split('T')[0]}.txt`;
+    a.download = `comments-${sessionData.name.replace(/[^a-z0-9]/gi, '_')}-${new Date().toISOString().split('T')[0]}.txt`;
     a.click();
     URL.revokeObjectURL(url);
 }
@@ -1564,7 +1669,7 @@ function groupSearchesAndPages() {
     return groups;
 }
 
-function createSearchContainer(group, groupIndex, showPages, showNotes, showAnnotations, showMetadata) {
+function createSearchContainer(group, groupIndex, showPages, showNotes, showComments, showMetadata) {
     const container = document.createElement('div');
     container.className = 'search-group';
     container.dataset.groupIndex = groupIndex;
@@ -1595,7 +1700,14 @@ function createSearchContainer(group, groupIndex, showPages, showNotes, showAnno
     
     const query = document.createElement('div');
     query.className = 'search-query';
-    query.textContent = `Search: "${group.query}"`;
+    // Use expandable text for search queries
+    const searchQueryText = `Search: "${group.query}"`;
+    const queryElement = createExpandableText(searchQueryText, 120);
+    if (queryElement.nodeType === Node.TEXT_NODE) {
+        query.textContent = searchQueryText;
+    } else {
+        query.appendChild(queryElement);
+    }
     
     const details = document.createElement('div');
     details.className = 'search-details';
@@ -1614,7 +1726,18 @@ function createSearchContainer(group, groupIndex, showPages, showNotes, showAnno
                 search.notes.forEach(note => {
                     const noteDiv = document.createElement('div');
                     noteDiv.className = 'event-note';
-                    noteDiv.textContent = `Student note: ${note.content}`;
+                    
+                    const notePrefix = document.createElement('span');
+                    notePrefix.textContent = 'Note: ';
+                    noteDiv.appendChild(notePrefix);
+                    
+                    const noteElement = createExpandableText(note.content, 120);
+                    if (noteElement.nodeType === Node.TEXT_NODE) {
+                        noteDiv.appendChild(noteElement);
+                    } else {
+                        noteDiv.appendChild(noteElement);
+                    }
+                    
                     searchInfo.appendChild(noteDiv);
                 });
             }
@@ -1635,22 +1758,22 @@ function createSearchContainer(group, groupIndex, showPages, showNotes, showAnno
         searchInfo.appendChild(searchActions);
     }
     
-    // Add annotation options
+    // Add comment options
     const searchId = `search-group-${groupIndex}`;
-    const annotation = annotationData[searchId];
+    const comment = commentData[searchId];
     
-    if (showAnnotations && (viewMode === 'teacher' || annotation)) {
-        if (annotation) {
-            const annotationDiv = createAnnotationDisplay(annotation, searchId);
-            searchInfo.appendChild(annotationDiv);
+    if (showComments && (viewMode === 'teacher' || comment)) {
+        if (comment) {
+            const commentDiv = createCommentDisplay(comment, searchId);
+            searchInfo.appendChild(commentDiv);
         }
         
-        if (viewMode === 'teacher' && !annotation) {
-            const addAnnotationBtn = document.createElement('button');
-            addAnnotationBtn.className = 'add-annotation-btn';
-            addAnnotationBtn.textContent = 'Add Annotation';
-            addAnnotationBtn.onclick = function() { showAnnotationForm(searchId, group.searches[0], null, this); };
-            searchInfo.appendChild(addAnnotationBtn);
+        if (viewMode === 'teacher' && !comment) {
+            const addCommentBtn = document.createElement('button');
+            addCommentBtn.className = 'add-comment-btn';
+            addCommentBtn.textContent = 'Add Comment';
+            addCommentBtn.onclick = function() { showCommentForm(searchId, group.searches[0], null, this); };
+            searchInfo.appendChild(addCommentBtn);
         }
     }
     
@@ -1671,7 +1794,7 @@ function createSearchContainer(group, groupIndex, showPages, showNotes, showAnno
         group.pages.forEach((page, pageIndex) => {
             const pageId = `page-${groupIndex}-${pageIndex}`;
             if (!removedPages.has(pageId)) {
-                const pageItem = createPageItem(page, pageId, showNotes, showAnnotations, showMetadata);
+                const pageItem = createPageItem(page, pageId, showNotes, showComments, showMetadata);
                 pagesContainer.appendChild(pageItem);
             }
         });
@@ -1682,7 +1805,7 @@ function createSearchContainer(group, groupIndex, showPages, showNotes, showAnno
     return container;
 }
 
-function createPageItem(page, pageId, showNotes, showAnnotations, showMetadata) {
+function createPageItem(page, pageId, showNotes, showComments, showMetadata) {
     const item = document.createElement('div');
     item.className = 'page-item';
     
@@ -1727,9 +1850,16 @@ function createPageItem(page, pageId, showNotes, showAnnotations, showMetadata) 
         pageTitle = pageTitle.charAt(0).toUpperCase() + pageTitle.slice(1); // Capitalize
     }
     
-    title.textContent = pageTitle;
+    // Use expandable text for titles
+    const titleElement = createExpandableText(pageTitle, 200);
+    if (titleElement.nodeType === Node.TEXT_NODE) {
+        title.textContent = pageTitle;
+        titleDiv.appendChild(title);
+    } else {
+        title.appendChild(titleElement);
+        titleDiv.appendChild(title);
+    }
     title.title = page.url; // Add URL as tooltip
-    titleDiv.appendChild(title);
     
     // Add source type indicator
     if (page.metadata && viewMode === 'teacher') {
@@ -1778,7 +1908,21 @@ function createPageItem(page, pageId, showNotes, showAnnotations, showMetadata) 
             const authorDiv = document.createElement('div');
             authorDiv.className = 'metadata-item';
             const authorText = authors ? authors.join(', ') : author;
-            authorDiv.innerHTML = `<span class="metadata-label">Author${authors && authors.length > 1 ? 's' : ''}:</span><span class="metadata-value">${authorText}</span>`;
+            const authorLabel = document.createElement('span');
+            authorLabel.className = 'metadata-label';
+            authorLabel.textContent = `Author${authors && authors.length > 1 ? 's' : ''}:`;
+            
+            const authorValue = document.createElement('span');
+            authorValue.className = 'metadata-value';
+            const authorElement = createExpandableText(authorText, 200);
+            if (authorElement.nodeType === Node.TEXT_NODE) {
+                authorValue.textContent = authorText;
+            } else {
+                authorValue.appendChild(authorElement);
+            }
+            
+            authorDiv.appendChild(authorLabel);
+            authorDiv.appendChild(authorValue);
             metadataSection.appendChild(authorDiv);
         }
         
@@ -1792,21 +1936,63 @@ function createPageItem(page, pageId, showNotes, showAnnotations, showMetadata) 
         if (publisher) {
             const publisherDiv = document.createElement('div');
             publisherDiv.className = 'metadata-item';
-            publisherDiv.innerHTML = `<span class="metadata-label">Publisher:</span><span class="metadata-value">${publisher}</span>`;
+            const publisherLabel = document.createElement('span');
+            publisherLabel.className = 'metadata-label';
+            publisherLabel.textContent = 'Publisher:';
+            
+            const publisherValue = document.createElement('span');
+            publisherValue.className = 'metadata-value';
+            const publisherElement = createExpandableText(publisher, 80);
+            if (publisherElement.nodeType === Node.TEXT_NODE) {
+                publisherValue.textContent = publisher;
+            } else {
+                publisherValue.appendChild(publisherElement);
+            }
+            
+            publisherDiv.appendChild(publisherLabel);
+            publisherDiv.appendChild(publisherValue);
             metadataSection.appendChild(publisherDiv);
         }
         
         if (journal) {
             const journalDiv = document.createElement('div');
             journalDiv.className = 'metadata-item';
-            journalDiv.innerHTML = `<span class="metadata-label">Journal:</span><span class="metadata-value">${journal}</span>`;
+            const journalLabel = document.createElement('span');
+            journalLabel.className = 'metadata-label';
+            journalLabel.textContent = 'Journal:';
+            
+            const journalValue = document.createElement('span');
+            journalValue.className = 'metadata-value';
+            const journalElement = createExpandableText(journal, 80);
+            if (journalElement.nodeType === Node.TEXT_NODE) {
+                journalValue.textContent = journal;
+            } else {
+                journalValue.appendChild(journalElement);
+            }
+            
+            journalDiv.appendChild(journalLabel);
+            journalDiv.appendChild(journalValue);
             metadataSection.appendChild(journalDiv);
         }
         
         if (publicationInfo) {
             const pubInfoDiv = document.createElement('div');
             pubInfoDiv.className = 'metadata-item';
-            pubInfoDiv.innerHTML = `<span class="metadata-label">Publication Info:</span><span class="metadata-value">${publicationInfo}</span>`;
+            const pubInfoLabel = document.createElement('span');
+            pubInfoLabel.className = 'metadata-label';
+            pubInfoLabel.textContent = 'Publication Info:';
+            
+            const pubInfoValue = document.createElement('span');
+            pubInfoValue.className = 'metadata-value';
+            const pubInfoElement = createExpandableText(publicationInfo, 80);
+            if (pubInfoElement.nodeType === Node.TEXT_NODE) {
+                pubInfoValue.textContent = publicationInfo;
+            } else {
+                pubInfoValue.appendChild(pubInfoElement);
+            }
+            
+            pubInfoDiv.appendChild(pubInfoLabel);
+            pubInfoDiv.appendChild(pubInfoValue);
             metadataSection.appendChild(pubInfoDiv);
         }
         
@@ -1839,12 +2025,11 @@ function createPageItem(page, pageId, showNotes, showAnnotations, showMetadata) 
             metadataSection.appendChild(citationDiv);
         }
         
-        // Show extraction info in teacher mode
-        if (viewMode === 'teacher' && metadata.extractorType) {
-            const extractorDiv = document.createElement('div');
-            extractorDiv.className = 'metadata-item extractor-info';
-            extractorDiv.innerHTML = `<span class="metadata-label">Extracted:</span><span class="metadata-value">${metadata.extractorType}${metadata.extractorSite ? ' (' + metadata.extractorSite + ')' : ''}</span>`;
-            metadataSection.appendChild(extractorDiv);
+        // Show metadata status indicators  
+        const statusDiv = createMetadataStatusIndicators(metadata, edited);
+        if (statusDiv) {
+            statusDiv.style.marginTop = '8px';
+            metadataSection.appendChild(statusDiv);
         }
         
         content.appendChild(metadataSection);
@@ -1855,7 +2040,18 @@ function createPageItem(page, pageId, showNotes, showAnnotations, showMetadata) 
         page.notes.forEach(note => {
             const noteDiv = document.createElement('div');
             noteDiv.className = 'event-note';
-            noteDiv.textContent = `Student note: ${note.content}`;
+            
+            const notePrefix = document.createElement('span');
+            notePrefix.textContent = 'Note: ';
+            noteDiv.appendChild(notePrefix);
+            
+            const noteElement = createExpandableText(note.content, 120);
+            if (noteElement.nodeType === Node.TEXT_NODE) {
+                noteDiv.appendChild(noteElement);
+            } else {
+                noteDiv.appendChild(noteElement);
+            }
+            
             content.appendChild(noteDiv);
         });
     }
@@ -1908,21 +2104,21 @@ function createPageItem(page, pageId, showNotes, showAnnotations, showMetadata) 
     
     // Don't append actionButtons to content anymore
     
-    // Add annotations
-    const annotation = annotationData[pageId];
+    // Add comments
+    const comment = commentData[pageId];
     
-    if (showAnnotations && (viewMode === 'teacher' || annotation)) {
-        if (annotation) {
-            const annotationDiv = createAnnotationDisplay(annotation, pageId);
-            content.appendChild(annotationDiv);
+    if (showComments && (viewMode === 'teacher' || comment)) {
+        if (comment) {
+            const commentDiv = createCommentDisplay(comment, pageId);
+            content.appendChild(commentDiv);
         }
         
-        if (viewMode === 'teacher' && !annotation) {
-            const addAnnotationBtn = document.createElement('button');
-            addAnnotationBtn.className = 'add-annotation-btn';
-            addAnnotationBtn.textContent = 'Add Annotation';
-            addAnnotationBtn.onclick = function() { showAnnotationForm(pageId, page, null, this); };
-            content.appendChild(addAnnotationBtn);
+        if (viewMode === 'teacher' && !comment) {
+            const addCommentBtn = document.createElement('button');
+            addCommentBtn.className = 'add-comment-btn';
+            addCommentBtn.textContent = 'Add Comment';
+            addCommentBtn.onclick = function() { showCommentForm(pageId, page, null, this); };
+            content.appendChild(addCommentBtn);
         }
     }
     
@@ -2029,10 +2225,10 @@ function enableUndoButton() {
         // Update button text to show what will be undone
         if (lastAction) {
             switch (lastAction.type) {
-                case 'annotation':
-                    undoBtn.textContent = 'Undo Annotation';
+                case 'comment':
+                    undoBtn.textContent = 'Undo Comment';
                     break;
-                case 'deleteAnnotation':
+                case 'deleteComment':
                     undoBtn.textContent = 'Undo Delete';
                     break;
                 case 'removePage':
@@ -2069,21 +2265,21 @@ function performUndo() {
     if (!lastAction) return;
     
     switch (lastAction.type) {
-        case 'annotation':
-            // Restore previous annotation state
+        case 'comment':
+            // Restore previous comment state
             if (lastAction.previousValue) {
-                annotationData[lastAction.eventId] = lastAction.previousValue;
+                commentData[lastAction.eventId] = lastAction.previousValue;
             } else {
-                delete annotationData[lastAction.eventId];
+                delete commentData[lastAction.eventId];
             }
-            localStorage.setItem(`annotations-${sessionData.id}`, JSON.stringify(annotationData));
+            localStorage.setItem(`comments-${sessionData.id}`, JSON.stringify(commentData));
             break;
             
-        case 'deleteAnnotation':
-            // Restore deleted annotation
+        case 'deleteComment':
+            // Restore deleted comment
             if (lastAction.previousValue) {
-                annotationData[lastAction.eventId] = lastAction.previousValue;
-                localStorage.setItem(`annotations-${sessionData.id}`, JSON.stringify(annotationData));
+                commentData[lastAction.eventId] = lastAction.previousValue;
+                localStorage.setItem(`comments-${sessionData.id}`, JSON.stringify(commentData));
             }
             break;
             
@@ -2204,8 +2400,9 @@ function showMetadataForm(pageId, page, buttonElement) {
     const modal = document.getElementById('metadataModal');
     const formContainer = document.getElementById('metadataFormContainer');
     
-    // Clear existing content
+    // Clear existing content and DOI flag
     formContainer.innerHTML = '';
+    delete modal.dataset.filledFromDoi;
     
     // Store escape handler for cleanup
     let escapeHandler;
@@ -2398,6 +2595,21 @@ function showMetadataForm(pageId, page, buttonElement) {
             newMetadata.authors = newMetadata.author.split(',').map(a => a.trim());
         }
         
+        // Preserve existing metadata flags (extractorType, extractorSite, doiMetadata, etc.)
+        const existingMetadata = { ...original, ...edited };
+        if (existingMetadata.extractorType) newMetadata.extractorType = existingMetadata.extractorType;
+        if (existingMetadata.extractorSite) newMetadata.extractorSite = existingMetadata.extractorSite;
+        if (existingMetadata.doiMetadata) newMetadata.doiMetadata = existingMetadata.doiMetadata;
+        if (existingMetadata.created) newMetadata.created = existingMetadata.created;
+        if (existingMetadata.lastUpdated) newMetadata.lastUpdated = existingMetadata.lastUpdated;
+        
+        // Check if this form was filled from DOI and mark accordingly
+        if (modal.dataset.filledFromDoi === 'true') {
+            newMetadata.doiMetadata = true;
+            // Clear the flag
+            delete modal.dataset.filledFromDoi;
+        }
+        
         // Mark as manually edited
         newMetadata.manuallyEdited = true;
         newMetadata.editTimestamp = new Date().toISOString();
@@ -2439,15 +2651,10 @@ function showMetadataForm(pageId, page, buttonElement) {
     form.appendChild(qualsGroup);
     form.appendChild(actions);
     
-    // Show original extraction info if available
-    if (original.extractorType) {
-        const infoDiv = document.createElement('div');
-        infoDiv.className = 'metadata-info';
-        infoDiv.style.fontSize = '0.85em';
-        infoDiv.style.color = '#666';
-        infoDiv.style.marginTop = '10px';
-        infoDiv.textContent = `Originally extracted via ${original.extractorType}${original.extractorSite ? ' from ' + original.extractorSite : ''}`;
-        form.appendChild(infoDiv);
+    // Add metadata status indicators
+    const statusDiv = createMetadataStatusIndicators(original, edited);
+    if (statusDiv) {
+        form.appendChild(statusDiv);
     }
     
     // Add form to modal and show it
@@ -2618,8 +2825,8 @@ function exportModifiedData() {
         ...modifiedData.contentPages
     ].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     
-    // Add teacher annotations as a new field
-    modifiedData.teacherAnnotations = annotationData;
+    // Add teacher comments as a new field
+    modifiedData.teacherComments = commentData;
     
     // Export the modified data
     const blob = new Blob([JSON.stringify(modifiedData, null, 2)], { type: 'application/json' });
@@ -3363,8 +3570,13 @@ function showDoiInputModal(titleInput, authorInput, dateInput, publisherInput, j
     const cancelBtn = document.getElementById('cancelDoiBtn');
     const closeBtn = document.querySelector('.close-doi-modal');
     
-    // Clear previous input
+    // Clear previous input and status
     doiInputField.value = '';
+    const statusDiv = document.getElementById('doiStatus');
+    if (statusDiv) {
+        statusDiv.style.display = 'none';
+        statusDiv.className = 'doi-status';
+    }
     
     // Store references to form inputs for later use
     modal.formInputs = {
@@ -3392,6 +3604,7 @@ function showDoiInputModal(titleInput, authorInput, dateInput, publisherInput, j
             modal.style.display = 'none';
             cleanup();
         } else if (e.key === 'Enter' && doiInputField.value.trim()) {
+            e.preventDefault();
             fetchMetadataFromDoi(modal.formInputs);
         }
     };
@@ -3412,45 +3625,64 @@ function showDoiInputModal(titleInput, authorInput, dateInput, publisherInput, j
 async function fetchMetadataFromDoi(formInputs) {
     const doiInputField = document.getElementById('doiInput');
     const fetchBtn = document.getElementById('fetchDoiBtn');
+    const statusDiv = document.getElementById('doiStatus');
     const doi = doiInputField.value.trim();
     
+    // Clear previous status
+    statusDiv.style.display = 'none';
+    statusDiv.className = 'doi-status';
+    
     if (!doi) {
-        alert('Please enter a DOI');
+        showDoiStatus('Please enter a DOI', 'error');
         return;
     }
     
     // Validate DOI format
     if (!doi.match(/^10\.\d{4,}(?:\.\d+)*\/[^\s]+/)) {
-        alert('Please enter a valid DOI (e.g., 10.1038/nature12373)');
+        showDoiStatus('Please enter a valid DOI (e.g., 10.1038/nature12373)', 'error');
         return;
     }
     
     // Show loading state
     fetchBtn.disabled = true;
     fetchBtn.textContent = 'Fetching...';
+    showDoiStatus('🔄 Fetching metadata from DOI registry...', 'loading');
     
     try {
         const metadata = await fetchDOIMetadata(doi);
         
         if (metadata) {
+            // Show success briefly
+            showDoiStatus('✓ Metadata fetched successfully!', 'success');
+            
             // Fill the form with fetched metadata
             fillMetadataForm(metadata, formInputs);
             
-            // Close DOI modal
-            document.getElementById('doiInputModal').style.display = 'none';
+            // Auto-close DOI modal after short delay
+            setTimeout(() => {
+                document.getElementById('doiInputModal').style.display = 'none';
+                // Clear the status for next time
+                statusDiv.style.display = 'none';
+            }, 1000);
             
-            alert('Metadata fetched successfully from DOI!');
         } else {
-            alert('Failed to fetch metadata for this DOI. Please check the DOI and try again.');
+            showDoiStatus('Failed to fetch metadata for this DOI. Please check the DOI and try again.', 'error');
         }
     } catch (error) {
         console.error('Error fetching DOI metadata:', error);
-        alert('Error fetching metadata: ' + error.message);
+        showDoiStatus('Error fetching metadata: ' + error.message, 'error');
     } finally {
         // Reset button state
         fetchBtn.disabled = false;
         fetchBtn.textContent = 'Fetch Metadata';
     }
+}
+
+function showDoiStatus(message, type) {
+    const statusDiv = document.getElementById('doiStatus');
+    statusDiv.textContent = message;
+    statusDiv.className = `doi-status ${type}`;
+    statusDiv.style.display = 'block';
 }
 
 async function fetchDOIMetadata(doi) {
@@ -3514,7 +3746,8 @@ function convertCrossRefToMetadata(crossrefData, doi) {
             publicationInfo: null,
             pages: crossrefData.page,
             abstract: crossrefData.abstract,
-            contentType: mapCrossRefTypeToContentType(crossrefData.type)
+            contentType: mapCrossRefTypeToContentType(crossrefData.type),
+            doiMetadata: true  // Flag to indicate this came from DOI API
         };
         
         // Create publication info from volume and issue
@@ -3579,7 +3812,8 @@ function convertCSLToMetadata(data, doi) {
             publicationInfo: null,
             pages: data.page,
             abstract: data.abstract,
-            contentType: mapCSLTypeToContentType(data.type)
+            contentType: mapCSLTypeToContentType(data.type),
+            doiMetadata: true  // Flag to indicate this came from DOI API
         };
         
         // Create publication info from volume and issue
@@ -3675,5 +3909,101 @@ function fillMetadataForm(metadata, formInputs) {
     if (metadata.doi) formInputs.doiInput.value = metadata.doi;
     if (metadata.contentType) formInputs.typeSelect.value = metadata.contentType;
     
+    // Mark that this form was filled from DOI (store on form container for save function to check)
+    if (metadata.doiMetadata) {
+        const modal = document.getElementById('metadataModal');
+        if (modal) {
+            modal.dataset.filledFromDoi = 'true';
+        }
+    }
+    
     // Note: We don't fill publisher or quals since they're typically not in DOI metadata
+}
+
+function createMetadataStatusIndicators(originalMetadata, editedMetadata) {
+    const metadata = { ...originalMetadata, ...editedMetadata };
+    const infoItems = [];
+    
+    // Check if metadata came from DOI API
+    if (metadata.doiMetadata) {
+        infoItems.push({
+            text: 'Metadata fetched from DOI registry',
+            color: '#2e7d32',
+            icon: '✓'
+        });
+    }
+    // Check if this is from an automatic extractor
+    else if (metadata.extractorType) {
+        let extractorText = `Metadata extracted via ${metadata.extractorType}`;
+        if (metadata.extractorSite) {
+            extractorText += ` from ${metadata.extractorSite}`;
+        }
+        infoItems.push({
+            text: extractorText,
+            color: '#666',
+            icon: '⚙'
+        });
+    }
+    
+    // Check if this is a repeat visit (has creation timestamp vs current visit)
+    if (metadata.created && metadata.lastUpdated) {
+        const created = new Date(metadata.created);
+        const lastUpdated = new Date(metadata.lastUpdated);
+        
+        // If last updated is significantly after creation, this is likely a repeat visit
+        if (lastUpdated.getTime() - created.getTime() > 60000) { // More than 1 minute difference
+            infoItems.push({
+                text: 'Metadata loaded from previous session',
+                color: '#1976d2',
+                icon: '↻'
+            });
+        }
+    }
+    
+    // Check if manual edits were made
+    if (metadata.manuallyEdited) {
+        const editTime = metadata.editTimestamp ? new Date(metadata.editTimestamp) : null;
+        let editText = 'Manual edits applied';
+        if (editTime) {
+            const now = new Date();
+            const diffMinutes = Math.round((now.getTime() - editTime.getTime()) / 60000);
+            if (diffMinutes < 1) {
+                editText += ' (just now)';
+            } else if (diffMinutes < 60) {
+                editText += ` (${diffMinutes}m ago)`;
+            } else if (diffMinutes < 1440) {
+                editText += ` (${Math.round(diffMinutes / 60)}h ago)`;
+            } else {
+                editText += ` (${Math.round(diffMinutes / 1440)}d ago)`;
+            }
+        }
+        infoItems.push({
+            text: editText,
+            color: '#f57c00',
+            icon: '✏'
+        });
+    }
+    
+    // Render the info items
+    if (infoItems.length > 0) {
+        const infoDiv = document.createElement('div');
+        infoDiv.className = 'metadata-status-info';
+        infoDiv.style.border = '1px solid #e0e0e0';
+        infoDiv.style.background = '#f9f9f9';
+        infoDiv.style.padding = '8px';
+        infoDiv.style.borderRadius = '4px';
+        infoDiv.style.marginTop = '10px';
+        infoDiv.style.fontSize = '0.85em';
+        
+        const infoHtml = infoItems.map(item => 
+            `<div style="color: ${item.color}; margin: 2px 0; line-height: 1.3;">
+                <span style="margin-right: 6px;">${item.icon}</span>${item.text}
+            </div>`
+        ).join('');
+        
+        infoDiv.innerHTML = infoHtml;
+        return infoDiv;
+    }
+    
+    return null;
 }

@@ -47,8 +47,8 @@
                 <h3>Actions</h3>
                 <div class="actions-content">
                     <div class="actions-group">
-                        <button id="exportAnnotations" class="export-btn">Export Annotations</button>
-                        <button id="exportModified" class="export-btn">Export Modified Data</button>
+                        <button id="exportModified" class="export-btn">Export</button>
+                        <button id="exportComments" class="export-btn">Export Comments Only</button>
                     </div>
                     <div class="actions-group">
                         <button id="undoBtn" class="undo-btn" disabled>Undo</button>
@@ -83,16 +83,16 @@
                     <div class="timeline-header">
                         <div class="timeline-controls">
                             <label>
-                                <input type="checkbox" id="showPages" checked> Show Pages
+                                <input type="checkbox" id="showPages" checked> Pages
                             </label>
                             <label>
-                                <input type="checkbox" id="showMetadata"> Show Metadata
+                                <input type="checkbox" id="showMetadata"> Metadata
                             </label>
                             <label>
-                                <input type="checkbox" id="showNotes"> Show Recorded Notes
+                                <input type="checkbox" id="showNotes"> Notes
                             </label>
                             <label>
-                                <input type="checkbox" id="showAnnotations"> Annotate
+                                <input type="checkbox" id="showComments"> Comments
                             </label>
                         </div>
                         <div class="timeline-actions">
@@ -145,6 +145,7 @@
                 <div class="doi-help-text" style="font-size: 0.9em; color: #666; margin-bottom: 15px;">
                     Enter the DOI (Digital Object Identifier) to automatically fetch metadata. Example: 10.1038/nature12373
                 </div>
+                <div id="doiStatus" class="doi-status" style="margin: 10px 0; min-height: 20px; display: none;"></div>
                 <div class="modal-buttons">
                     <button id="fetchDoiBtn" class="fetch-doi-btn">Fetch Metadata</button>
                     <button id="cancelDoiBtn" class="cancel-doi-btn">Cancel</button>
