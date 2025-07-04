@@ -132,6 +132,27 @@
         </div>
     </div>
 
+    <!-- Modal for DOI input -->
+    <div id="doiInputModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Fill Metadata from DOI</h3>
+                <button class="close-doi-modal">&times;</button>
+            </div>
+            <div class="doi-input-container">
+                <label for="doiInput">Enter DOI:</label>
+                <input type="text" id="doiInput" placeholder="10.xxxx/xxxxx" style="width: 100%; box-sizing: border-box; margin: 10px 0;">
+                <div class="doi-help-text" style="font-size: 0.9em; color: #666; margin-bottom: 15px;">
+                    Enter the DOI (Digital Object Identifier) to automatically fetch metadata. Example: 10.1038/nature12373
+                </div>
+                <div class="modal-buttons">
+                    <button id="fetchDoiBtn" class="fetch-doi-btn">Fetch Metadata</button>
+                    <button id="cancelDoiBtn" class="cancel-doi-btn">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Add Mammoth.js for DOCX parsing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     <script src="visualizer.js"></script>

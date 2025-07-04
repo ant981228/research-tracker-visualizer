@@ -1461,3 +1461,105 @@ h1 {
     text-align: center;
 }
 
+/* DOI Autofill Styles */
+.fill-from-doi-btn {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    margin: 0 5px;
+    transition: background-color 0.3s;
+}
+
+.fill-from-doi-btn:hover {
+    background-color: #2980b9;
+}
+
+.doi-input-container {
+    padding: 10px;
+}
+
+.doi-input-container label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.doi-input-container input {
+    padding: 10px;
+    border: 2px solid #d0d0d0;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.doi-input-container input:focus {
+    outline: none;
+    border-color: #3498db;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+.doi-help-text {
+    font-size: 0.9em;
+    color: #666;
+    margin-bottom: 15px;
+    line-height: 1.4;
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 20px;
+}
+
+.fetch-doi-btn {
+    background-color: #27ae60;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s;
+}
+
+.fetch-doi-btn:hover:not(:disabled) {
+    background-color: #229954;
+}
+
+.fetch-doi-btn:disabled {
+    background-color: #95a5a6;
+    cursor: not-allowed;
+}
+
+.cancel-doi-btn {
+    background-color: #95a5a6;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.3s;
+}
+
+.cancel-doi-btn:hover {
+    background-color: #7f8c8d;
+}
+
+.close-doi-modal {
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #7f8c8d;
+}
+
+.close-doi-modal:hover {
+    color: #2c3e50;
+}
+

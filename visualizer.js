@@ -2412,6 +2412,13 @@ function showMetadataForm(pageId, page, buttonElement) {
         document.removeEventListener('keydown', escapeHandler);
     };
     
+    const fillFromDoiBtn = document.createElement('button');
+    fillFromDoiBtn.className = 'fill-from-doi-btn';
+    fillFromDoiBtn.textContent = 'Fill from DOI';
+    fillFromDoiBtn.onclick = () => {
+        showDoiInputModal(titleInput, authorInput, dateInput, publisherInput, journalInput, pubInfoInput, pagesInput, doiInput, qualsInput, typeSelect);
+    };
+    
     const cancelBtn = document.createElement('button');
     cancelBtn.className = 'cancel-metadata-btn';
     cancelBtn.textContent = 'Cancel';
@@ -2421,6 +2428,7 @@ function showMetadataForm(pageId, page, buttonElement) {
     };
     
     actions.appendChild(saveBtn);
+    actions.appendChild(fillFromDoiBtn);
     actions.appendChild(cancelBtn);
     
     // Assemble form
@@ -3345,4 +3353,217 @@ function loadSavedSidebarState() {
     } else {
         toggleIcon.textContent = '«';
     }
+}
+
+// DOI Autofill Functionality
+function showDoiInputModal(titleInput, authorInput, dateInput, publisherInput, journalInput, pubInfoInput, pagesInput, doiInput, qualsInput, typeSelect) {
+    const modal = document.getElementById('doiInputModal');
+    const doiInputField = document.getElementById('doiInput');
+    const fetchBtn = document.getElementById('fetchDoiBtn');
+    const cancelBtn = document.getElementById('cancelDoiBtn');
+    const closeBtn = document.querySelector('.close-doi-modal');
+    
+    // Clear previous input
+    doiInputField.value = '';
+    
+    // Store references to form inputs for later use
+    modal.formInputs = {
+        titleInput, authorInput, dateInput, publisherInput, 
+        journalInput, pubInfoInput, pagesInput, doiInput, 
+        qualsInput, typeSelect
+    };
+    
+    // Show modal
+    modal.style.display = 'block';
+    doiInputField.focus();
+    
+    // Set up event handlers
+    const handleFetch = () => fetchMetadataFromDoi(modal.formInputs);
+    const handleCancel = () => {
+        modal.style.display = 'none';
+        cleanup();
+    };
+    const handleClose = () => {
+        modal.style.display = 'none';
+        cleanup();
+    };
+    const handleKeydown = (e) => {
+        if (e.key === 'Escape') {
+            modal.style.display = 'none';
+            cleanup();
+        } else if (e.key === 'Enter' && doiInputField.value.trim()) {
+            fetchMetadataFromDoi(modal.formInputs);
+        }
+    };
+    
+    const cleanup = () => {
+        fetchBtn.removeEventListener('click', handleFetch);
+        cancelBtn.removeEventListener('click', handleCancel);
+        closeBtn.removeEventListener('click', handleClose);
+        document.removeEventListener('keydown', handleKeydown);
+    };
+    
+    fetchBtn.addEventListener('click', handleFetch);
+    cancelBtn.addEventListener('click', handleCancel);
+    closeBtn.addEventListener('click', handleClose);
+    document.addEventListener('keydown', handleKeydown);
+}
+
+async function fetchMetadataFromDoi(formInputs) {
+    const doiInputField = document.getElementById('doiInput');
+    const fetchBtn = document.getElementById('fetchDoiBtn');
+    const doi = doiInputField.value.trim();
+    
+    if (!doi) {
+        alert('Please enter a DOI');
+        return;
+    }
+    
+    // Validate DOI format
+    if (!doi.match(/^10\.\d{4,}(?:\.\d+)*\/[^\s]+/)) {
+        alert('Please enter a valid DOI (e.g., 10.1038/nature12373)');
+        return;
+    }
+    
+    // Show loading state
+    fetchBtn.disabled = true;
+    fetchBtn.textContent = 'Fetching...';
+    
+    try {
+        const metadata = await fetchDOIMetadata(doi);
+        
+        if (metadata) {
+            // Fill the form with fetched metadata
+            fillMetadataForm(metadata, formInputs);
+            
+            // Close DOI modal
+            document.getElementById('doiInputModal').style.display = 'none';
+            
+            alert('Metadata fetched successfully from DOI!');
+        } else {
+            alert('Failed to fetch metadata for this DOI. Please check the DOI and try again.');
+        }
+    } catch (error) {
+        console.error('Error fetching DOI metadata:', error);
+        alert('Error fetching metadata: ' + error.message);
+    } finally {
+        // Reset button state
+        fetchBtn.disabled = false;
+        fetchBtn.textContent = 'Fetch Metadata';
+    }
+}
+
+async function fetchDOIMetadata(doi) {
+    try {
+        console.log('Fetching metadata for DOI:', doi);
+        
+        // Use CORS proxy to access DOI.org API
+        const proxyUrl = 'https://api.allorigins.win/raw?url=';
+        const targetUrl = `https://doi.org/${encodeURIComponent(doi)}`;
+        
+        const response = await fetch(proxyUrl + encodeURIComponent(targetUrl), {
+            headers: {
+                'Accept': 'application/vnd.citationstyles.csl+json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('DOI metadata received:', data);
+        
+        // Convert CSL JSON to our metadata format
+        const metadata = {
+            doi: doi,
+            title: data.title,
+            authors: [],
+            publishDate: null,
+            journal: data['container-title'],
+            publicationInfo: null,
+            pages: data.page,
+            abstract: data.abstract,
+            contentType: mapCSLTypeToContentType(data.type)
+        };
+        
+        // Create publication info from volume and issue
+        if (data.volume || data.issue) {
+            const parts = [];
+            if (data.volume) parts.push(`Vol. ${data.volume}`);
+            if (data.issue) parts.push(`No. ${data.issue}`);
+            metadata.publicationInfo = parts.join(', ');
+        }
+        
+        // Process authors
+        if (data.author && Array.isArray(data.author)) {
+            metadata.authors = data.author.map(author => {
+                if (author.given && author.family) {
+                    return `${author.given} ${author.family}`;
+                } else if (author.name) {
+                    return author.name;
+                } else if (author.family) {
+                    return author.family;
+                }
+                return '';
+            }).filter(name => name);
+            
+            metadata.author = metadata.authors.join(', ');
+        }
+        
+        // Process publication date
+        if (data.published && data.published['date-parts']) {
+            const dateParts = data.published['date-parts'][0];
+            if (dateParts && dateParts.length > 0) {
+                const year = dateParts[0];
+                const month = dateParts[1] || 1;
+                const day = dateParts[2] || 1;
+                metadata.publishDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            }
+        } else if (data.issued && data.issued['date-parts']) {
+            const dateParts = data.issued['date-parts'][0];
+            if (dateParts && dateParts.length > 0) {
+                const year = dateParts[0];
+                const month = dateParts[1] || 1;
+                const day = dateParts[2] || 1;
+                metadata.publishDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            }
+        }
+        
+        return metadata;
+    } catch (error) {
+        console.error('Error fetching DOI metadata:', error);
+        return null;
+    }
+}
+
+function mapCSLTypeToContentType(cslType) {
+    const mapping = {
+        'article-journal': 'journal-article',
+        'article-magazine': 'magazine-article', 
+        'article-newspaper': 'news-article',
+        'book': 'book',
+        'chapter': 'book-chapter',
+        'paper-conference': 'conference-paper',
+        'report': 'report',
+        'thesis': 'thesis',
+        'webpage': 'website',
+        'post-weblog': 'blog-post'
+    };
+    
+    return mapping[cslType] || 'other';
+}
+
+function fillMetadataForm(metadata, formInputs) {
+    // Fill the form fields with the fetched metadata
+    if (metadata.title) formInputs.titleInput.value = metadata.title;
+    if (metadata.author) formInputs.authorInput.value = metadata.author;
+    if (metadata.publishDate) formInputs.dateInput.value = metadata.publishDate;
+    if (metadata.journal) formInputs.journalInput.value = metadata.journal;
+    if (metadata.publicationInfo) formInputs.pubInfoInput.value = metadata.publicationInfo;
+    if (metadata.pages) formInputs.pagesInput.value = metadata.pages;
+    if (metadata.doi) formInputs.doiInput.value = metadata.doi;
+    if (metadata.contentType) formInputs.typeSelect.value = metadata.contentType;
+    
+    // Note: We don't fill publisher or quals since they're typically not in DOI metadata
 }
