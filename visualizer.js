@@ -3457,23 +3457,118 @@ async function fetchDOIMetadata(doi) {
     try {
         console.log('Fetching metadata for DOI:', doi);
         
-        // Use CORS proxy to access DOI.org API
-        const proxyUrl = 'https://api.allorigins.win/raw?url=';
-        const targetUrl = `https://doi.org/${encodeURIComponent(doi)}`;
-        
-        const response = await fetch(proxyUrl + encodeURIComponent(targetUrl), {
-            headers: {
-                'Accept': 'application/vnd.citationstyles.csl+json'
+        // Method 1: Try CrossRef API directly (most reliable)
+        try {
+            console.log('Trying CrossRef API...');
+            const response = await fetch(`https://api.crossref.org/works/${doi}`);
+            
+            if (response.ok) {
+                const crossrefData = await response.json();
+                if (crossrefData.status === 'ok' && crossrefData.message) {
+                    console.log('CrossRef data received:', crossrefData.message);
+                    return convertCrossRefToMetadata(crossrefData.message, doi);
+                }
             }
-        });
-        
-        if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        } catch (e) {
+            console.log('CrossRef API failed:', e.message);
         }
         
-        const data = await response.json();
-        console.log('DOI metadata received:', data);
+        // Method 2: Try different CORS proxy
+        try {
+            console.log('Trying CORS proxy...');
+            const proxyUrl = 'https://corsproxy.io/?';
+            const targetUrl = `https://doi.org/${encodeURIComponent(doi)}`;
+            
+            const response = await fetch(proxyUrl + encodeURIComponent(targetUrl), {
+                headers: {
+                    'Accept': 'application/vnd.citationstyles.csl+json'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log('DOI metadata received via proxy:', data);
+                return convertCSLToMetadata(data, doi);
+            }
+        } catch (e) {
+            console.log('CORS proxy failed:', e.message);
+        }
         
+        // If both methods fail
+        throw new Error('Unable to fetch DOI metadata. The DOI service may be unavailable.');
+        
+    } catch (error) {
+        console.error('Error fetching DOI metadata:', error);
+        return null;
+    }
+}
+
+function convertCrossRefToMetadata(crossrefData, doi) {
+    try {
+        const metadata = {
+            doi: doi,
+            title: crossrefData.title ? crossrefData.title[0] : null,
+            authors: [],
+            publishDate: null,
+            journal: crossrefData['container-title'] ? crossrefData['container-title'][0] : null,
+            publicationInfo: null,
+            pages: crossrefData.page,
+            abstract: crossrefData.abstract,
+            contentType: mapCrossRefTypeToContentType(crossrefData.type)
+        };
+        
+        // Create publication info from volume and issue
+        if (crossrefData.volume || crossrefData.issue) {
+            const parts = [];
+            if (crossrefData.volume) parts.push(`Vol. ${crossrefData.volume}`);
+            if (crossrefData.issue) parts.push(`No. ${crossrefData.issue}`);
+            metadata.publicationInfo = parts.join(', ');
+        }
+        
+        // Process authors
+        if (crossrefData.author && Array.isArray(crossrefData.author)) {
+            metadata.authors = crossrefData.author.map(author => {
+                if (author.given && author.family) {
+                    return `${author.given} ${author.family}`;
+                } else if (author.name) {
+                    return author.name;
+                } else if (author.family) {
+                    return author.family;
+                }
+                return '';
+            }).filter(name => name);
+            
+            metadata.author = metadata.authors.join(', ');
+        }
+        
+        // Process publication date
+        if (crossrefData.published && crossrefData.published['date-parts']) {
+            const dateParts = crossrefData.published['date-parts'][0];
+            if (dateParts && dateParts.length > 0) {
+                const year = dateParts[0];
+                const month = dateParts[1] || 1;
+                const day = dateParts[2] || 1;
+                metadata.publishDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            }
+        } else if (crossrefData.issued && crossrefData.issued['date-parts']) {
+            const dateParts = crossrefData.issued['date-parts'][0];
+            if (dateParts && dateParts.length > 0) {
+                const year = dateParts[0];
+                const month = dateParts[1] || 1;
+                const day = dateParts[2] || 1;
+                metadata.publishDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            }
+        }
+        
+        return metadata;
+    } catch (error) {
+        console.error('Error converting CrossRef data:', error);
+        return null;
+    }
+}
+
+function convertCSLToMetadata(data, doi) {
+    try {
         // Convert CSL JSON to our metadata format
         const metadata = {
             doi: doi,
@@ -3532,9 +3627,24 @@ async function fetchDOIMetadata(doi) {
         
         return metadata;
     } catch (error) {
-        console.error('Error fetching DOI metadata:', error);
+        console.error('Error converting CSL data:', error);
         return null;
     }
+}
+
+function mapCrossRefTypeToContentType(crossrefType) {
+    const mapping = {
+        'journal-article': 'journal-article',
+        'book-chapter': 'book',
+        'monograph': 'book',
+        'report': 'report',
+        'book': 'book',
+        'thesis': 'thesis',
+        'conference-paper': 'conference-paper',
+        'proceedings-article': 'conference-paper'
+    };
+    
+    return mapping[crossrefType] || 'other';
 }
 
 function mapCSLTypeToContentType(cslType) {
