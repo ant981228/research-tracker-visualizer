@@ -1770,6 +1770,8 @@ function createPageItem(page, pageId, showNotes, showAnnotations, showMetadata) 
         const arxivId = (edited && edited.arxivId) || metadata.arxivId;
         const citationKey = (edited && edited.citationKey) || metadata.citationKey;
         const journal = (edited && edited.journal) || metadata.journal;
+        const publicationInfo = (edited && edited.publicationInfo) || metadata.publicationInfo;
+        const pages = (edited && edited.pages) || metadata.pages;
         
         // Display author(s)
         if (author || authors) {
@@ -1799,6 +1801,20 @@ function createPageItem(page, pageId, showNotes, showAnnotations, showMetadata) 
             journalDiv.className = 'metadata-item';
             journalDiv.innerHTML = `<span class="metadata-label">Journal:</span><span class="metadata-value">${journal}</span>`;
             metadataSection.appendChild(journalDiv);
+        }
+        
+        if (publicationInfo) {
+            const pubInfoDiv = document.createElement('div');
+            pubInfoDiv.className = 'metadata-item';
+            pubInfoDiv.innerHTML = `<span class="metadata-label">Publication Info:</span><span class="metadata-value">${publicationInfo}</span>`;
+            metadataSection.appendChild(pubInfoDiv);
+        }
+        
+        if (pages) {
+            const pagesDiv = document.createElement('div');
+            pagesDiv.className = 'metadata-item';
+            pagesDiv.innerHTML = `<span class="metadata-label">Pages:</span><span class="metadata-value">${pages}</span>`;
+            metadataSection.appendChild(pagesDiv);
         }
         
         if (contentType) {
@@ -2273,6 +2289,30 @@ function showMetadataForm(pageId, page, buttonElement) {
     journalGroup.appendChild(journalInput);
     rightColumn.appendChild(journalGroup);
     
+    // Publication Info field
+    const pubInfoGroup = document.createElement('div');
+    pubInfoGroup.className = 'form-group';
+    pubInfoGroup.innerHTML = '<label>Publication Info:</label>';
+    const pubInfoInput = document.createElement('input');
+    pubInfoInput.type = 'text';
+    pubInfoInput.className = 'metadata-input';
+    pubInfoInput.value = edited.publicationInfo || original.publicationInfo || '';
+    pubInfoInput.placeholder = 'e.g., Vol. 15, No. 3';
+    pubInfoGroup.appendChild(pubInfoInput);
+    leftColumn.appendChild(pubInfoGroup);
+    
+    // Pages field
+    const pagesGroup = document.createElement('div');
+    pagesGroup.className = 'form-group';
+    pagesGroup.innerHTML = '<label>Pages:</label>';
+    const pagesInput = document.createElement('input');
+    pagesInput.type = 'text';
+    pagesInput.className = 'metadata-input';
+    pagesInput.value = edited.pages || original.pages || '';
+    pagesInput.placeholder = 'e.g., 123-145';
+    pagesGroup.appendChild(pagesInput);
+    rightColumn.appendChild(pagesGroup);
+    
     // DOI field
     const doiGroup = document.createElement('div');
     doiGroup.className = 'form-group';
@@ -2346,6 +2386,8 @@ function showMetadataForm(pageId, page, buttonElement) {
             publishDate: dateInput.value.trim(),
             publisher: publisherInput.value.trim(),
             journal: journalInput.value.trim(),
+            publicationInfo: pubInfoInput.value.trim(),
+            pages: pagesInput.value.trim(),
             doi: doiInput.value.trim(),
             quals: qualsInput.value.trim(),
             contentType: typeSelect.value
@@ -2851,6 +2893,8 @@ function matchCardsToPages() {
             const publishDate = edited.publishDate || metadata.publishDate || '';
             const publisher = edited.publisher || metadata.publisher || '';
             const journal = edited.journal || metadata.journal || '';
+            const publicationInfo = edited.publicationInfo || metadata.publicationInfo || '';
+            const pages = edited.pages || metadata.pages || '';
             
             if (cardIndex === 0 && pageIndex === 0) {
                 console.log('Sample page metadata:', {
