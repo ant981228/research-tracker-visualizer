@@ -3419,6 +3419,71 @@ function viewCards(pageId, page) {
     showCardsModal(pageId, page);
 }
 
+// Function to update page metadata display in cards modal
+function updatePageMetadataDisplay(page, pageId) {
+    const metadataContainer = document.getElementById('pageMetadataContent');
+    if (!metadataContainer) return;
+    
+    metadataContainer.innerHTML = '';
+    
+    // Get metadata (including any edited metadata)
+    const edited = editedMetadata[pageId] || {};
+    const original = page.metadata || {};
+    
+    // Helper function to get the current value (edited or original)
+    const getValue = (field) => edited[field] || original[field];
+    
+    // Create metadata items
+    const metadataFields = [
+        { key: 'title', label: 'Title' },
+        { key: 'author', label: 'Author' },
+        { key: 'authors', label: 'Authors' },
+        { key: 'publishDate', label: 'Published' },
+        { key: 'journal', label: 'Journal' },
+        { key: 'publisher', label: 'Publisher' },
+        { key: 'doi', label: 'DOI' },
+        { key: 'contentType', label: 'Type' }
+    ];
+    
+    metadataFields.forEach(({ key, label }) => {
+        const value = getValue(key);
+        if (value) {
+            const metadataItem = document.createElement('div');
+            metadataItem.className = 'metadata-item-compact';
+            
+            const metadataLabel = document.createElement('span');
+            metadataLabel.className = 'metadata-label-compact';
+            metadataLabel.textContent = `${label}:`;
+            
+            const metadataValue = document.createElement('span');
+            metadataValue.className = 'metadata-value-compact';
+            
+            // Handle arrays (like authors)
+            const displayValue = Array.isArray(value) ? value.join(', ') : String(value);
+            
+            // Use expandable text for long values
+            if (displayValue && displayValue.length > 150) {
+                const expandableText = createExpandableText(displayValue, 150);
+                metadataValue.appendChild(expandableText);
+            } else {
+                metadataValue.textContent = displayValue;
+            }
+            
+            metadataItem.appendChild(metadataLabel);
+            metadataItem.appendChild(metadataValue);
+            metadataContainer.appendChild(metadataItem);
+        }
+    });
+    
+    // If no metadata available
+    if (metadataContainer.children.length === 0) {
+        const noMetadata = document.createElement('div');
+        noMetadata.className = 'no-metadata';
+        noMetadata.textContent = 'No metadata available';
+        metadataContainer.appendChild(noMetadata);
+    }
+}
+
 // Function to show cards modal
 function showCardsModal(pageId, page) {
     // Create modal if it doesn't exist
@@ -3434,10 +3499,16 @@ function showCardsModal(pageId, page) {
                     <button class="close-modal" onclick="document.getElementById('cardsModal').style.display='none'">&times;</button>
                 </div>
                 <div class="cards-modal-body">
-                    <nav class="cards-nav">
-                        <h4>Sections</h4>
-                        <ul id="cardsNavList"></ul>
-                    </nav>
+                    <div class="cards-left-panel">
+                        <div class="page-metadata-display" id="pageMetadataDisplay">
+                            <h4>Page Metadata</h4>
+                            <div id="pageMetadataContent" class="page-metadata-content"></div>
+                        </div>
+                        <nav class="cards-nav">
+                            <h4>Cards</h4>
+                            <ul id="cardsNavList"></ul>
+                        </nav>
+                    </div>
                     <div id="cardsContent" class="cards-content-area"></div>
                 </div>
             </div>
@@ -3464,6 +3535,9 @@ function showCardsModal(pageId, page) {
     // Update modal content
     const pageTitle = (page.metadata && page.metadata.title) || page.title || 'Unknown Page';
     document.getElementById('cardsPageTitle').textContent = pageTitle;
+    
+    // Update page metadata display
+    updatePageMetadataDisplay(page, pageId);
     
     const cardsContent = document.getElementById('cardsContent');
     cardsContent.innerHTML = '';
@@ -3500,17 +3574,32 @@ function showCardsModal(pageId, page) {
             <div class="card-header">
                 <h4>${card.header}</h4>
                 <div class="match-info">
-                    <span class="match-score">Score: ${card.matchScore.toFixed(2)}</span>
-                    <span class="match-types">Matched: ${matchTypes.join(', ')}</span>
-                    <span class="weighting-method">Method: ${weightingMethod}</span>
-                    <button class="move-card-btn" onclick="showMoveCardModal('${pageId}', ${card.cardIndex !== undefined ? card.cardIndex : index}, '${card.header.replace(/'/g, "\\'")}')">Move</button>
-                    <button class="unlink-card-btn" onclick="unlinkCard('${pageId}', ${card.cardIndex !== undefined ? card.cardIndex : index})">Unlink</button>
+                    <div class="match-details">
+                        <span class="match-score">Score: ${card.matchScore.toFixed(2)}</span>
+                        <span class="match-types">Matched: ${matchTypes.join(', ')}</span>
+                        <span class="weighting-method">Method: ${weightingMethod}</span>
+                    </div>
+                    <div class="card-actions">
+                        <button class="move-card-btn" data-page-id="${pageId}" data-card-index="${card.cardIndex !== undefined ? card.cardIndex : index}" data-card-header="${card.header.replace(/"/g, '&quot;')}">Move</button>
+                        <button class="unlink-card-btn" onclick="unlinkCard('${pageId}', ${card.cardIndex !== undefined ? card.cardIndex : index})">Unlink</button>
+                    </div>
                 </div>
             </div>
             <div class="card-content">${card.content}</div>
         `;
         
         cardsContent.appendChild(cardDiv);
+    });
+    
+    // Add event listeners for move buttons
+    const moveButtons = cardsContent.querySelectorAll('.move-card-btn');
+    moveButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const pageId = this.dataset.pageId;
+            const cardIndex = parseInt(this.dataset.cardIndex);
+            const cardHeader = this.dataset.cardHeader;
+            showMoveCardModal(pageId, cardIndex, cardHeader);
+        });
     });
     
     // Add escape key handler each time modal is shown
@@ -3627,6 +3716,79 @@ function unlinkCard(pageId, cardIndex) {
     updateTimeline();
 }
 
+// Function to create metadata tooltip content
+function createMetadataTooltip(metadata, page) {
+    const items = [];
+    
+    // Helper function to add metadata field if it exists
+    const addField = (label, value) => {
+        if (value && value.trim()) {
+            // Limit each field to reasonable length for tooltip
+            const truncatedValue = value.length > 100 ? value.substring(0, 97) + '...' : value;
+            items.push(`${label}: ${truncatedValue}`);
+        }
+    };
+    
+    // Add metadata fields
+    addField('Title', metadata.title);
+    
+    // Handle authors array or single author
+    if (metadata.authors && Array.isArray(metadata.authors)) {
+        addField('Authors', metadata.authors.join(', '));
+    } else if (metadata.author) {
+        addField('Author', metadata.author);
+    }
+    
+    addField('Journal', metadata.journal);
+    addField('Publisher', metadata.publisher);
+    addField('Publication Date', metadata.publishDate);
+    addField('DOI', metadata.doi);
+    addField('Content Type', metadata.contentType);
+    
+    // Add URL as fallback
+    if (items.length === 0) {
+        try {
+            const url = new URL(page.url);
+            items.push(`URL: ${url.hostname}`);
+        } catch (e) {
+            items.push('No metadata available');
+        }
+    }
+    
+    return items.join('\n');
+}
+
+// Function to position tooltip near mouse cursor
+function positionTooltip(event, tooltip) {
+    const padding = 15;
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // Get tooltip dimensions
+    const tooltipRect = tooltip.getBoundingClientRect();
+    const tooltipWidth = tooltipRect.width;
+    const tooltipHeight = tooltipRect.height;
+    
+    // Calculate position
+    let left = event.clientX + padding;
+    let top = event.clientY - tooltipHeight / 2;
+    
+    // Adjust if tooltip would go off screen to the right
+    if (left + tooltipWidth > viewportWidth - padding) {
+        left = event.clientX - tooltipWidth - padding;
+    }
+    
+    // Adjust if tooltip would go off screen vertically
+    if (top < padding) {
+        top = padding;
+    } else if (top + tooltipHeight > viewportHeight - padding) {
+        top = viewportHeight - tooltipHeight - padding;
+    }
+    
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+}
+
 // Function to extract the cite from a card based on matching method
 function extractCardCite(card) {
     if (!card.content) {
@@ -3644,36 +3806,8 @@ function extractCardCite(card) {
         return '<em>No paragraphs found</em>';
     }
     
-    // Check if this card used URL cutoff method
-    const isUrlCutoff = card.matchDetails && card.matchDetails.weightingMethod === 'URL cutoff';
-    
-    if (isUrlCutoff) {
-        // Find the paragraph ending in a URL
-        for (let i = paragraphs.length - 1; i >= 0; i--) {
-            const pText = paragraphs[i].textContent.trim();
-            const urlRegex = /https?:\/\/[^\s]+$/;
-            if (urlRegex.test(pText)) {
-                return paragraphs[i].outerHTML;
-            }
-        }
-        
-        // Fallback: if no URL found, use last paragraph
-        return paragraphs[paragraphs.length - 1].outerHTML;
-    } else {
-        // Position-based or other methods: use first paragraph after header
-        // Skip the first paragraph if it looks like a header (short and potentially bold)
-        let targetParagraph = paragraphs[0];
-        
-        if (paragraphs.length > 1) {
-            const firstPText = paragraphs[0].textContent.trim();
-            // If first paragraph is very short (likely a header), use second paragraph
-            if (firstPText.length < 100) {
-                targetParagraph = paragraphs[1];
-            }
-        }
-        
-        return targetParagraph.outerHTML;
-    }
+    // Always use first paragraph method for cite extraction
+    return paragraphs[0].outerHTML;
 }
 
 // Function to show modal for moving a card to another page
@@ -3723,14 +3857,18 @@ function showMoveCardModal(sourcePageId, cardIndex, cardHeader) {
         return;
     }
     
+    // Remove existing modal if it exists and create a new one
+    let existingModal = document.getElementById('moveCardModal');
+    if (existingModal) {
+        document.body.removeChild(existingModal);
+    }
+    
     // Create modal
-    let modal = document.getElementById('moveCardModal');
-    if (!modal) {
-        modal = document.createElement('div');
-        modal.id = 'moveCardModal';
-        modal.className = 'modal';
+    let modal = document.createElement('div');
+    modal.id = 'moveCardModal';
+    modal.className = 'modal move-card-modal';
         modal.innerHTML = `
-            <div class="modal-content">
+            <div class="modal-content move-card-modal-content">
                 <div class="modal-header">
                     <h3>Move Card: <span id="moveCardTitle"></span></h3>
                     <button class="close-modal">&times;</button>
@@ -3741,15 +3879,19 @@ function showMoveCardModal(sourcePageId, cardIndex, cardHeader) {
                         <div id="cardCiteContent" class="card-cite-content"></div>
                     </div>
                     <p>Select the page you want to move this card to:</p>
-                    <div class="page-selection">
-                        <label for="targetPageSelect">Target Page:</label>
-                        <select id="targetPageSelect" style="width: 100%; margin: 10px 0; padding: 8px;">
-                        </select>
-                    </div>
-                    <div id="selectedPageInfo" class="selected-page-info" style="margin: 15px 0; padding: 10px; background: #f8f9fa; border-radius: 4px; display: none;">
-                        <h4>Match Details for Selected Page:</h4>
-                        <div id="matchScoreInfo"></div>
-                        <div id="matchFieldsInfo"></div>
+                    <div class="page-selection-table-container">
+                        <table class="page-selection-table">
+                            <thead>
+                                <tr>
+                                    <th>Select</th>
+                                    <th>Page Title</th>
+                                    <th>Match Score</th>
+                                    <th>Matching Fields</th>
+                                </tr>
+                            </thead>
+                            <tbody id="pageSelectionTableBody">
+                            </tbody>
+                        </table>
                     </div>
                 </div>
                 <div class="modal-buttons">
@@ -3784,7 +3926,8 @@ function showMoveCardModal(sourcePageId, cardIndex, cardHeader) {
             }
         };
         document.addEventListener('keydown', escapeHandler);
-    }
+        
+        document.body.appendChild(modal);
     
     // Update modal content
     document.getElementById('moveCardTitle').textContent = cardHeader;
@@ -3793,68 +3936,119 @@ function showMoveCardModal(sourcePageId, cardIndex, cardHeader) {
     const cardCite = extractCardCite(sourceCard);
     document.getElementById('cardCiteContent').innerHTML = cardCite;
     
-    const targetSelect = document.getElementById('targetPageSelect');
-    targetSelect.innerHTML = '';
+    const tableBody = document.getElementById('pageSelectionTableBody');
+    tableBody.innerHTML = '';
     
-    // Populate dropdown with pages sorted by match quality
-    availablePages.forEach(pageInfo => {
-        const option = document.createElement('option');
-        option.value = pageInfo.pageId;
-        
-        // Truncate title to fit dropdown width (approximately 60 characters)
-        const truncatedTitle = pageInfo.title.length > 60 ? 
-            pageInfo.title.substring(0, 57) + '...' : pageInfo.title;
-        
-        // Format as two lines: title on first line, score and fields on second line
-        const matchFieldsText = pageInfo.matchFields.length > 0 ? 
-            pageInfo.matchFields.join(', ') : 'No matches';
-        const secondLine = `Score: ${pageInfo.matchScore.toFixed(2)} | Matches: ${matchFieldsText}`;
-        
-        // Use newline character to create two lines in the option text
-        option.textContent = `${truncatedTitle}\n${secondLine}`;
-        
-        option.dataset.matchScore = pageInfo.matchScore;
-        option.dataset.matchFields = JSON.stringify(pageInfo.matchFields);
-        option.dataset.pageTitle = pageInfo.title;
-        targetSelect.appendChild(option);
-    });
+    // Track selected page
+    let selectedPageId = null;
     
-    // Add change handler to show match details
-    targetSelect.onchange = function() {
-        const selectedOption = targetSelect.options[targetSelect.selectedIndex];
-        if (selectedOption) {
-            const matchScore = parseFloat(selectedOption.dataset.matchScore);
-            const matchFields = JSON.parse(selectedOption.dataset.matchFields);
-            const pageTitle = selectedOption.dataset.pageTitle;
-            
-            document.getElementById('selectedPageInfo').style.display = 'block';
-            document.getElementById('matchScoreInfo').innerHTML = `
-                <strong>Match Score:</strong> ${matchScore.toFixed(2)}
-            `;
-            document.getElementById('matchFieldsInfo').innerHTML = `
-                <strong>Matching Fields:</strong> ${matchFields.join(', ') || 'None'}
-            `;
-        } else {
-            document.getElementById('selectedPageInfo').style.display = 'none';
+    // Populate table with pages sorted by match quality
+    availablePages.forEach((pageInfo, index) => {
+        const row = document.createElement('tr');
+        row.className = 'page-selection-row';
+        row.dataset.pageId = pageInfo.pageId;
+        
+        // Create metadata tooltip content
+        const metadata = pageInfo.page.metadata || {};
+        const tooltipContent = createMetadataTooltip(metadata, pageInfo.page);
+        
+        // Radio button cell
+        const selectCell = document.createElement('td');
+        const radioInput = document.createElement('input');
+        radioInput.type = 'radio';
+        radioInput.name = 'targetPage';
+        radioInput.value = pageInfo.pageId;
+        radioInput.id = `page-option-${index}`;
+        if (index === 0) {
+            radioInput.checked = true;
+            selectedPageId = pageInfo.pageId;
+            row.classList.add('selected');
         }
-    };
-    
-    // Trigger initial change event
-    if (targetSelect.options.length > 0) {
-        targetSelect.selectedIndex = 0;
-        targetSelect.onchange();
-    }
+        selectCell.appendChild(radioInput);
+        
+        // Title cell
+        const titleCell = document.createElement('td');
+        titleCell.className = 'page-title-cell';
+        titleCell.textContent = pageInfo.title;
+        
+        // Score cell
+        const scoreCell = document.createElement('td');
+        scoreCell.className = 'page-score-cell';
+        scoreCell.textContent = pageInfo.matchScore.toFixed(2);
+        
+        // Matching fields cell
+        const fieldsCell = document.createElement('td');
+        fieldsCell.className = 'page-fields-cell';
+        fieldsCell.textContent = pageInfo.matchFields.length > 0 ? 
+            pageInfo.matchFields.join(', ') : 'No matches';
+        
+        row.appendChild(selectCell);
+        row.appendChild(titleCell);
+        row.appendChild(scoreCell);
+        row.appendChild(fieldsCell);
+        
+        // Add tooltip functionality
+        if (tooltipContent) {
+            let tooltip = null;
+            
+            // Store tooltip content without using title attribute
+            row.dataset.tooltipContent = tooltipContent;
+            
+            row.addEventListener('mouseenter', function(e) {
+                // Create tooltip element
+                tooltip = document.createElement('div');
+                tooltip.className = 'page-metadata-tooltip';
+                tooltip.textContent = tooltipContent;
+                document.body.appendChild(tooltip);
+                
+                // Position tooltip
+                tooltip.style.display = 'block';
+                positionTooltip(e, tooltip);
+            });
+            
+            row.addEventListener('mousemove', function(e) {
+                if (tooltip) {
+                    positionTooltip(e, tooltip);
+                }
+            });
+            
+            row.addEventListener('mouseleave', function() {
+                if (tooltip) {
+                    document.body.removeChild(tooltip);
+                    tooltip = null;
+                }
+            });
+        }
+        
+        // Add click handler to row
+        row.addEventListener('click', function() {
+            radioInput.checked = true;
+            document.querySelectorAll('.page-selection-row').forEach(r => r.classList.remove('selected'));
+            row.classList.add('selected');
+            selectedPageId = pageInfo.pageId;
+        });
+        
+        // Add change handler to radio
+        radioInput.addEventListener('change', function() {
+            document.querySelectorAll('.page-selection-row').forEach(r => r.classList.remove('selected'));
+            row.classList.add('selected');
+            selectedPageId = pageInfo.pageId;
+        });
+        
+        tableBody.appendChild(row);
+    });
     
     // Set up confirm button
     document.getElementById('confirmMoveBtn').onclick = () => {
-        const selectedPageId = targetSelect.value;
-        if (selectedPageId) {
-            const selectedOption = targetSelect.options[targetSelect.selectedIndex];
-            const matchScore = parseFloat(selectedOption.dataset.matchScore);
-            const matchFields = JSON.parse(selectedOption.dataset.matchFields);
+        const checkedRadio = document.querySelector('input[name="targetPage"]:checked');
+        if (checkedRadio) {
+            const targetPageId = checkedRadio.value;
+            const selectedPage = availablePages.find(p => p.pageId === targetPageId);
             
-            moveCardToPage(sourcePageId, cardArrayIndex, selectedPageId, matchScore, matchFields);
-            modal.style.display = 'none';
+            if (selectedPage) {
+                moveCardToPage(sourcePageId, cardArrayIndex, targetPageId, selectedPage.matchScore, selectedPage.matchFields);
+                modal.style.display = 'none';
+            }
         }
     };
     
@@ -4153,7 +4347,44 @@ function moveCardToPage(sourcePageId, cardIndex, targetPageId, matchScore, match
     // Update timeline
     updateTimeline();
     
-    alert(`Card moved successfully! The card now shows "Method: Manual" with a match score of ${matchScore.toFixed(2)}.`);
+    // Show success message in move modal
+    showMoveSuccessMessage(matchScore);
+}
+
+// Function to show success message in move modal
+function showMoveSuccessMessage(matchScore) {
+    const modal = document.getElementById('moveCardModal');
+    if (!modal) return;
+    
+    // Replace modal content with success message
+    const modalContent = modal.querySelector('.move-card-modal-content');
+    modalContent.innerHTML = `
+        <div class="modal-header">
+            <h3 style="color: #27ae60;">✓ Card Moved Successfully!</h3>
+        </div>
+        <div class="move-success-body">
+            <div class="success-message">
+                <p>The card has been moved to the selected page.</p>
+                <p>New match score: <strong>${matchScore.toFixed(2)}</strong></p>
+                <p>Method: <strong>Manual</strong></p>
+            </div>
+        </div>
+        <div class="modal-buttons">
+            <button id="closeSuccessBtn" class="confirm-move-btn">Close</button>
+        </div>
+    `;
+    
+    // Add close handler
+    modal.querySelector('#closeSuccessBtn').onclick = () => {
+        modal.style.display = 'none';
+    };
+    
+    // Auto-close after 3 seconds
+    setTimeout(() => {
+        if (modal.style.display === 'block') {
+            modal.style.display = 'none';
+        }
+    }, 3000);
 }
 
 // Font management functions
