@@ -200,9 +200,39 @@ h1 {
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
+.session-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+}
+
 .session-info h2 {
     font-size: 18px;
-    margin-bottom: 10px;
+    margin: 0;
+    flex-grow: 1;
+}
+
+.unload-json-btn {
+    background-color: transparent;
+    color: #7f8c8d;
+    border: 1px solid #dee2e6;
+    border-radius: 4px;
+    width: 24px;
+    height: 24px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.unload-json-btn:hover {
+    background-color: #e74c3c;
+    color: white;
+    border-color: #e74c3c;
 }
 
 .session-stats {
@@ -324,8 +354,18 @@ h1 {
     background-color: #229954;
 }
 
+.restore-btn:disabled {
+    background-color: #95a5a6;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.restore-btn:disabled:hover {
+    background-color: #95a5a6;
+}
+
 .rematch-btn {
-    background-color: #8e44ad;
+    background-color: #34495e;
     color: white;
     border: none;
     padding: 10px 20px;
@@ -336,7 +376,7 @@ h1 {
 }
 
 .rematch-btn:hover {
-    background-color: #732d91;
+    background-color: #2980b9;
 }
 
 /* Rematch progress indicator */
@@ -406,6 +446,27 @@ h1 {
 
 .remove-search-btn:hover {
     background-color: #c0392b;
+}
+
+/* Unload DOCX button */
+.unload-docx-btn {
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    margin-top: 5px;
+    transition: background-color 0.3s;
+}
+
+.unload-docx-btn:hover {
+    background-color: #5a6268;
+}
+
+.unload-docx-btn.hidden {
+    display: none;
 }
 
 /* Actions box styles */
@@ -483,15 +544,33 @@ h1 {
 .toggle-btn {
     background: none;
     border: none;
-    font-size: 16px;
     cursor: pointer;
     padding: 20px;
-    color: #7f8c8d;
-    transition: transform 0.2s;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
 }
 
-.toggle-btn:hover {
-    color: #2c3e50;
+.toggle-btn::after {
+    content: '';
+    width: 0;
+    height: 0;
+    border-style: solid;
+    border-width: 6px 0 6px 10px;
+    border-color: transparent transparent transparent #7f8c8d;
+    transition: transform 0.2s, border-color 0.2s;
+    display: block;
+}
+
+.toggle-btn.expanded::after {
+    transform: rotate(90deg);
+}
+
+.toggle-btn:hover::after {
+    border-color: transparent transparent transparent #2c3e50;
 }
 
 .search-content {
@@ -2066,6 +2145,16 @@ h1 {
 .confirm-btn.confirm-yes.restore:hover {
     background-color: #218838;
     border-color: #1e7e34;
+}
+
+.confirm-btn.confirm-yes.rematch {
+    background-color: #34495e;
+    border-color: #34495e;
+}
+
+.confirm-btn.confirm-yes.rematch:hover {
+    background-color: #2980b9;
+    border-color: #2980b9;
 }
 
 .confirm-btn.confirm-no {

@@ -382,6 +382,10 @@ const sampleData = {
 
 // Initialize the visualizer
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize button states
+    disableUndoButton();
+    disableRestoreButton();
+    
     document.getElementById('fileInput').addEventListener('change', function(e) {
         // Update filename display
         const fileName = e.target.files[0]?.name || 'No JSON file chosen';
@@ -410,6 +414,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     document.getElementById('loadSample').addEventListener('click', loadSampleData);
     
+    // Unload buttons
+    document.getElementById('unloadDOCX').addEventListener('click', unloadDOCX);
+    document.getElementById('unloadJSON').addEventListener('click', unloadJSON);
+    
     // Tab switching
     document.querySelectorAll('.tab-button').forEach(function(button) {
         button.addEventListener('click', switchTab);
@@ -432,7 +440,12 @@ document.addEventListener('DOMContentLoaded', function() {
     // Undo and restore buttons
     document.getElementById('undoBtn').addEventListener('click', performUndo);
     document.getElementById('restorePages').addEventListener('click', restoreAllRemovedPages);
-    document.getElementById('rematchCards').addEventListener('click', rematchCardsToPages);
+    document.getElementById('rematchCards').addEventListener('click', function() {
+        const rematchBtn = event.target;
+        showInlineConfirmation(rematchBtn, () => {
+            rematchCardsToPages();
+        }, false, true); // false = not restore, true = rematch (blue)
+    });
     
     // Sidebar toggle
     document.getElementById('sidebarToggle').addEventListener('click', toggleSidebar);
@@ -527,6 +540,13 @@ function processSessionData() {
     loadRemovedPages();
     loadRemovedSearches();
     loadEditedMetadata();
+    
+    // Update restore button state based on removed items
+    if (removedPages.size === 0 && removedSearches.size === 0) {
+        disableRestoreButton();
+    } else {
+        enableRestoreButton();
+    }
     
     // Match cards to pages if DOCX was loaded
     if (parsedCards.length > 0) {
@@ -1463,7 +1483,7 @@ function loadSavedComments() {
 }
 
 // Helper function to show inline confirmation buttons
-function showInlineConfirmation(originalButton, confirmCallback, isRestore = false) {
+function showInlineConfirmation(originalButton, confirmCallback, isRestore = false, isRematch = false) {
     const originalText = originalButton.textContent;
     const originalClass = originalButton.className;
     
@@ -1479,7 +1499,10 @@ function showInlineConfirmation(originalButton, confirmCallback, isRestore = fal
     
     // Create confirm button (checkmark)
     const confirmBtn = document.createElement('button');
-    confirmBtn.className = `confirm-btn confirm-yes${isRestore ? ' restore' : ''}`;
+    let classModifier = '';
+    if (isRestore) classModifier = ' restore';
+    else if (isRematch) classModifier = ' rematch';
+    confirmBtn.className = `confirm-btn confirm-yes${classModifier}`;
     confirmBtn.textContent = '✓';
     confirmBtn.title = 'Confirm';
     
@@ -1786,8 +1809,7 @@ function createSearchContainer(group, groupIndex, showPages, showNotes, showComm
     searchHeader.className = 'search-header';
     
     const toggleBtn = document.createElement('button');
-    toggleBtn.className = 'toggle-btn';
-    toggleBtn.innerHTML = '▼';
+    toggleBtn.className = 'toggle-btn expanded';
     toggleBtn.onclick = () => toggleSearchGroup(groupIndex);
     
     const searchContent = document.createElement('div');
@@ -2266,10 +2288,10 @@ function toggleSearchGroup(groupIndex) {
     if (container) {
         if (container.style.display === 'none') {
             container.style.display = 'block';
-            toggleBtn.innerHTML = '▼';
+            toggleBtn.classList.add('expanded');
         } else {
             container.style.display = 'none';
-            toggleBtn.innerHTML = '▶';
+            toggleBtn.classList.remove('expanded');
         }
     }
 }
@@ -2867,7 +2889,7 @@ function expandAll() {
         container.style.display = 'block';
     });
     document.querySelectorAll('.toggle-btn').forEach(btn => {
-        btn.innerHTML = '▼';
+        btn.classList.add('expanded');
     });
 }
 
@@ -2876,7 +2898,7 @@ function collapseAll() {
         container.style.display = 'none';
     });
     document.querySelectorAll('.toggle-btn').forEach(btn => {
-        btn.innerHTML = '▶';
+        btn.classList.remove('expanded');
     });
 }
 
@@ -3065,6 +3087,75 @@ function getPageIndexInGroup(page, originalIndex) {
 let parsedSections = [];
 let parsedCards = [];
 
+// Function to unload JSON and return to home screen
+function unloadJSON() {
+    // Clear all session data
+    sessionData = null;
+    parsedSections = [];
+    parsedCards = [];
+    
+    // Clear all tracking data
+    removedPages.clear();
+    removedSearches.clear();
+    commentData = {};
+    editedMetadata = {};
+    unlinkedCards.clear();
+    importedCardMatchingHistory = null;
+    lastAction = null;
+    
+    // Reset UI elements
+    document.getElementById('fileInputName').textContent = 'No JSON file chosen';
+    document.getElementById('fileInput').value = '';
+    document.getElementById('docxInputName').textContent = 'No DOCX file chosen';
+    document.getElementById('docxInput').value = '';
+    document.getElementById('parsedSectionsLink').classList.add('hidden');
+    document.getElementById('unloadDOCX').classList.add('hidden');
+    
+    // Hide all session-related UI
+    document.getElementById('sessionInfo').classList.add('hidden');
+    document.getElementById('actionsBox').classList.add('hidden');
+    document.getElementById('visualization').classList.add('hidden');
+    
+    // Clear timeline content
+    document.getElementById('timelineContent').innerHTML = '';
+    
+    // Disable buttons that require session data
+    disableUndoButton();
+    disableRestoreButton();
+    
+    console.log('JSON unloaded - returned to home screen');
+}
+
+// Function to unload DOCX and clear all cards
+function unloadDOCX() {
+    // Clear parsed sections and cards
+    parsedSections = [];
+    parsedCards = [];
+    
+    // Clear cards from all pages
+    if (sessionData && sessionData.contentPages) {
+        sessionData.contentPages.forEach(page => {
+            delete page.cards;
+        });
+    }
+    
+    // Clear unlinked cards but DO NOT clear importedCardMatchingHistory
+    // This preserves manual matches and unlinks for when DOCX is reloaded
+    unlinkedCards.clear();
+    
+    // Reset DOCX UI elements
+    document.getElementById('docxInputName').textContent = 'No DOCX file chosen';
+    document.getElementById('docxInput').value = '';
+    document.getElementById('parsedSectionsLink').classList.add('hidden');
+    document.getElementById('unloadDOCX').classList.add('hidden');
+    hideDocxProgress();
+    
+    // Update timeline to reflect no cards
+    updateTimeline();
+    
+    console.log('DOCX unloaded and cards cleared (card matching history preserved)');
+}
+
 // Function to parse DOCX file
 async function parseDOCXFile(file) {
     // Show progress indicator
@@ -3189,13 +3280,16 @@ function hideDocxProgress() {
 // Function to update the parsed sections UI
 function updateParsedSectionsUI() {
     const link = document.getElementById('parsedSectionsLink');
+    const unloadBtn = document.getElementById('unloadDOCX');
     const sectionCount = parsedSections.length;
     
     if (sectionCount > 0) {
         link.textContent = `Parsed ${sectionCount} Section${sectionCount !== 1 ? 's' : ''}`;
         link.classList.remove('hidden');
+        unloadBtn.classList.remove('hidden');
     } else {
         link.classList.add('hidden');
+        unloadBtn.classList.add('hidden');
     }
 }
 

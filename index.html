@@ -31,6 +31,7 @@
                                 <span class="progress-text">Parsing document sections...</span>
                             </div>
                             <a id="parsedSectionsLink" class="parsed-sections-link hidden" href="#">Parsed 0 Sections</a>
+                            <button id="unloadDOCX" class="unload-docx-btn hidden">Unload DOCX</button>
                         </div>
                         <button id="loadSample">Load Sample JSON Data</button>
                     </div>
@@ -38,7 +39,10 @@
             </header>
 
             <div id="sessionInfo" class="session-info hidden">
-                <h2 id="sessionName"></h2>
+                <div class="session-header">
+                    <h2 id="sessionName"></h2>
+                    <button id="unloadJSON" class="unload-json-btn" title="Unload JSON">✕</button>
+                </div>
                 <div class="session-stats">
                     <span id="sessionDuration"></span>
                     <span id="searchCount"></span>
@@ -56,14 +60,14 @@
                     </div>
                     <div class="actions-group">
                         <button id="undoBtn" class="undo-btn" disabled>Undo</button>
-                        <button id="restorePages" class="restore-btn">Restore All Removed Items</button>
-                    </div>
-                    <div class="actions-group">
                         <button id="rematchCards" class="rematch-btn">Rematch Cards to Pages</button>
                         <div id="rematchProgress" class="rematch-progress hidden">
                             <span class="progress-spinner">⏳</span>
                             <span class="progress-text">Rematching cards to pages...</span>
                         </div>
+                    </div>
+                    <div class="actions-group">
+                        <button id="restorePages" class="restore-btn" disabled>Restore All Removed Items</button>
                     </div>
                 </div>
             </div>
