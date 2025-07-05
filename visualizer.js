@@ -5,6 +5,7 @@ let removedPages = new Set();
 let removedSearches = new Set(); // Store removed searches
 let lastAction = null; // For undo functionality
 let editedMetadata = {}; // Store edited metadata
+let unlinkedCards = new Set(); // Store unlinked card-page combinations (format: "cardIndex-pageUrl")
 
 // Sample data for demonstration
 const sampleData = {
@@ -430,6 +431,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Undo and restore buttons
     document.getElementById('undoBtn').addEventListener('click', performUndo);
     document.getElementById('restorePages').addEventListener('click', restoreAllRemovedPages);
+    document.getElementById('rematchCards').addEventListener('click', rematchCardsToPages);
     
     // Sidebar toggle
     document.getElementById('sidebarToggle').addEventListener('click', toggleSidebar);
@@ -3408,6 +3410,300 @@ function matchCardsToPages() {
     updateTimeline();
 }
 
+// Function to rematch cards to pages with respect for manual moves and unlinks
+function rematchCardsToPages() {
+    if (!sessionData || !sessionData.contentPages || parsedCards.length === 0) {
+        showRematchError('No session data or cards available for rematching.');
+        return;
+    }
+    
+    // Show progress indicator
+    showRematchProgress();
+    
+    // Use setTimeout to allow UI to update before starting intensive work
+    setTimeout(() => {
+        try {
+            console.log('Rematching cards to pages...');
+    
+    // Store current manual assignments before clearing
+    const manualAssignments = new Map(); // cardIndex -> {pageUrl, matchScore, matchFields}
+    
+    sessionData.contentPages.forEach(page => {
+        if (page.cards) {
+            page.cards.forEach(card => {
+                // Preserve manual moves
+                if (card.matchDetails && card.matchDetails.weightingMethod === 'Manual') {
+                    manualAssignments.set(card.cardIndex, {
+                        pageUrl: page.url,
+                        matchScore: card.matchScore,
+                        matchFields: card.matchDetails
+                    });
+                }
+            });
+        }
+    });
+    
+    // Clear all page cards
+    sessionData.contentPages.forEach(page => {
+        page.cards = [];
+    });
+    
+    // Create a map to track which cards have been assigned
+    const cardAssignments = new Map(); // cardIndex -> {pageIndex, score}
+    
+    // For each card, find the best matching pages
+    parsedCards.forEach((card, cardIndex) => {
+        // Check if this card has a manual assignment
+        if (manualAssignments.has(cardIndex)) {
+            const manualData = manualAssignments.get(cardIndex);
+            // Find the page with matching URL
+            const targetPage = sessionData.contentPages.find(p => p.url === manualData.pageUrl);
+            if (targetPage) {
+                const cardData = {
+                    ...card,
+                    cardIndex: cardIndex,
+                    matchScore: manualData.matchScore,
+                    matchDetails: manualData.matchFields
+                };
+                targetPage.cards.push(cardData);
+                console.log(`Preserved manual assignment: Card ${cardIndex} to page ${manualData.pageUrl}`);
+                return; // Skip automatic matching for this card
+            }
+        }
+        
+        // Perform automatic matching for non-manual cards
+        const cardText = card.contentText;
+        const cardHeader = card.header;
+        
+        // Detect URL in card text
+        const urlRegex = /https?:\/\/[^\s]+/;
+        const urlMatch = cardText.match(urlRegex);
+        const urlCutoffPosition = urlMatch ? urlMatch.index : null;
+        
+        // Score each page
+        const pageScores = sessionData.contentPages.map((page, pageIndex) => {
+            // Check if this card-page combination was previously unlinked
+            const unlinkedKey = `${cardIndex}-${page.url}`;
+            if (unlinkedCards.has(unlinkedKey)) {
+                return { pageIndex, score: -1, matchDetails: null }; // Exclude unlinked combinations
+            }
+            
+            let score = 0;
+            const matchDetails = {
+                urlMatch: false,
+                titleMatch: false,
+                authorMatch: false,
+                dateMatch: false,
+                publicationMatch: false,
+                weightingMethod: urlCutoffPosition !== null ? 'URL cutoff' : 'Position-based'
+            };
+            
+            // Get page metadata (including edited metadata)
+            const edited = editedMetadata[`page-${pageIndex}-0`] || {};
+            const metadata = page.metadata || {};
+            const pageTitle = edited.title || metadata.title || page.title || '';
+            const pageUrl = page.url || '';
+            const author = edited.author || metadata.author || '';
+            const authors = edited.authors || metadata.authors || [];
+            const publishDate = edited.publishDate || metadata.publishDate || '';
+            const journal = edited.journal || metadata.journal || '';
+            const publisher = edited.publisher || metadata.publisher || '';
+            
+            // URL matching logic (same as original)
+            try {
+                const cardUrlParts = cardHeader.toLowerCase().split(' ');
+                const pageUrlObj = new URL(pageUrl);
+                const pageDomain = pageUrlObj.hostname.toLowerCase();
+                
+                const hasUrlMatch = cardUrlParts.some(part => 
+                    part.length > 3 && pageDomain.includes(part.replace(/[^a-z0-9]/g, ''))
+                );
+                
+                if (hasUrlMatch) {
+                    score += 3;
+                    matchDetails.urlMatch = true;
+                }
+            } catch (e) {
+                // Invalid URL, skip URL matching
+            }
+            
+            // Title matching
+            if (pageTitle && cardHeader) {
+                const titleWords = pageTitle.toLowerCase().split(/\s+/);
+                const cardWords = cardHeader.toLowerCase().split(/\s+/);
+                
+                let commonWords = 0;
+                titleWords.forEach(word => {
+                    if (word.length > 3 && cardWords.some(cWord => cWord.includes(word) || word.includes(cWord))) {
+                        commonWords++;
+                    }
+                });
+                
+                if (commonWords > 0) {
+                    score += Math.min(commonWords * 2, 8);
+                    matchDetails.titleMatch = true;
+                }
+            }
+            
+            // Author matching
+            const allAuthors = [author, ...authors].filter(Boolean);
+            if (allAuthors.length > 0 && cardText) {
+                const cardTextLower = cardText.toLowerCase();
+                const hasAuthorMatch = allAuthors.some(authorName => {
+                    const nameParts = authorName.toLowerCase().split(/\s+/);
+                    return nameParts.some(part => part.length > 2 && cardTextLower.includes(part));
+                });
+                
+                if (hasAuthorMatch) {
+                    score += 4;
+                    matchDetails.authorMatch = true;
+                }
+            }
+            
+            // Date matching
+            if (publishDate && cardText) {
+                const year = publishDate.substring(0, 4);
+                if (year && cardText.includes(year)) {
+                    score += 2;
+                    matchDetails.dateMatch = true;
+                }
+            }
+            
+            // Publication matching
+            const publications = [journal, publisher].filter(Boolean);
+            if (publications.length > 0 && cardText) {
+                const cardTextLower = cardText.toLowerCase();
+                const hasPublicationMatch = publications.some(pub => {
+                    const pubWords = pub.toLowerCase().split(/\s+/);
+                    return pubWords.some(word => word.length > 3 && cardTextLower.includes(word));
+                });
+                
+                if (hasPublicationMatch) {
+                    score += 3;
+                    matchDetails.publicationMatch = true;
+                }
+            }
+            
+            return { pageIndex, score, matchDetails };
+        }).filter(result => result.score >= 0); // Filter out unlinked combinations
+        
+        // Find the best match
+        if (pageScores.length > 0) {
+            const bestMatch = pageScores.reduce((best, current) => current.score > best.score ? current : best);
+            
+            if (bestMatch.score >= 2) { // Minimum threshold
+                cardAssignments.set(cardIndex, bestMatch);
+            }
+        }
+    });
+    
+    // Apply the assignments
+    cardAssignments.forEach((assignment, cardIndex) => {
+        const page = sessionData.contentPages[assignment.pageIndex];
+        const card = parsedCards[cardIndex];
+        
+        if (page && card) {
+            const cardData = {
+                ...card,
+                cardIndex: cardIndex,
+                matchScore: assignment.score,
+                matchDetails: assignment.matchDetails
+            };
+            
+            page.cards.push(cardData);
+        }
+    });
+    
+    // Update the timeline to reflect changes
+    updateTimeline();
+    
+    // Show results
+    let totalMatches = 0;
+    let manualCount = manualAssignments.size;
+    sessionData.contentPages.forEach(page => {
+        if (page.cards && page.cards.length > 0) {
+            totalMatches += page.cards.length;
+        }
+    });
+    
+            // Show success state, then hide after delay
+            showRematchSuccess(totalMatches, manualCount, unlinkedCards.size);
+            setTimeout(() => {
+                hideRematchProgress();
+            }, 3000); // Show success for 3 seconds
+            
+        } catch (error) {
+            console.error('Error during rematch:', error);
+            showRematchError('Error occurred during rematching. Please try again.');
+        }
+    }, 100); // Small delay to allow UI update
+}
+
+// Function to show rematch progress indicator
+function showRematchProgress() {
+    const progressDiv = document.getElementById('rematchProgress');
+    const button = document.getElementById('rematchCards');
+    
+    if (progressDiv) {
+        progressDiv.classList.remove('hidden', 'success', 'error');
+        progressDiv.querySelector('.progress-text').textContent = 'Rematching cards to pages...';
+        progressDiv.querySelector('.progress-spinner').textContent = '⏳';
+    }
+    
+    if (button) {
+        button.disabled = true;
+    }
+}
+
+// Function to show rematch success state
+function showRematchSuccess(totalMatches, manualCount, unlinkedCount) {
+    const progressDiv = document.getElementById('rematchProgress');
+    const spinner = progressDiv?.querySelector('.progress-spinner');
+    const text = progressDiv?.querySelector('.progress-text');
+    
+    if (progressDiv && spinner && text) {
+        progressDiv.classList.add('success');
+        spinner.textContent = '✓';
+        text.textContent = `Rematch complete! ${totalMatches} matches (${manualCount} manual preserved, ${unlinkedCount} unlinks respected)`;
+    }
+}
+
+// Function to show rematch error state
+function showRematchError(errorMessage) {
+    const progressDiv = document.getElementById('rematchProgress');
+    const spinner = progressDiv?.querySelector('.progress-spinner');
+    const text = progressDiv?.querySelector('.progress-text');
+    
+    if (progressDiv && spinner && text) {
+        progressDiv.classList.add('error');
+        spinner.textContent = '✗';
+        text.textContent = errorMessage;
+    }
+    
+    // Auto-hide error after 5 seconds
+    setTimeout(() => {
+        hideRematchProgress();
+    }, 5000);
+}
+
+// Function to hide rematch progress indicator
+function hideRematchProgress() {
+    const progressDiv = document.getElementById('rematchProgress');
+    const button = document.getElementById('rematchCards');
+    
+    if (progressDiv) {
+        progressDiv.classList.add('hidden');
+        // Reset to default state
+        progressDiv.classList.remove('success', 'error');
+        progressDiv.querySelector('.progress-text').textContent = 'Rematching cards to pages...';
+        progressDiv.querySelector('.progress-spinner').textContent = '⏳';
+    }
+    
+    if (button) {
+        button.disabled = false;
+    }
+}
+
 // Function to view cards associated with a page
 function viewCards(pageId, page) {
     if (!page.cards || page.cards.length === 0) {
@@ -3698,6 +3994,12 @@ function unlinkCard(pageId, cardIndex) {
                 }
             }
         }
+    });
+    
+    // Track unlinked card-page combinations
+    affectedPages.forEach(pageInfo => {
+        const unlinkedKey = `${removedCard.cardIndex}-${pageInfo.page.url}`;
+        unlinkedCards.add(unlinkedKey);
     });
     
     // Track action for undo

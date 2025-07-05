@@ -324,6 +324,61 @@ h1 {
     background-color: #229954;
 }
 
+.rematch-btn {
+    background-color: #8e44ad;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+.rematch-btn:hover {
+    background-color: #732d91;
+}
+
+/* Rematch progress indicator */
+.rematch-progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 5px 0;
+    padding: 6px 10px;
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 4px;
+    font-size: 0.85em;
+    color: #856404;
+}
+
+.rematch-progress.hidden {
+    display: none !important;
+}
+
+.rematch-progress.success {
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+    color: #155724;
+}
+
+.rematch-progress.success .progress-spinner {
+    animation: none;
+    color: #28a745;
+}
+
+.rematch-progress.error {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+}
+
+.rematch-progress.error .progress-spinner {
+    animation: none;
+    color: #dc3545;
+}
+
 .expand-btn, .collapse-btn {
     background-color: #34495e;
     padding: 10px 14px !important;
