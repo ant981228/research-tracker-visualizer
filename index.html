@@ -26,6 +26,10 @@
                                 <input type="file" id="docxInput" accept=".docx" style="display: none;">
                             </label>
                             <span id="docxInputName" class="file-input-name">No DOCX file chosen</span>
+                            <div id="docxProgress" class="docx-progress hidden">
+                                <span class="progress-spinner">⏳</span>
+                                <span class="progress-text">Parsing document sections...</span>
+                            </div>
                             <a id="parsedSectionsLink" class="parsed-sections-link hidden" href="#">Parsed 0 Sections</a>
                         </div>
                         <button id="loadSample">Load Sample JSON Data</button>
