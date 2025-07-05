@@ -560,6 +560,13 @@ function updateTimeline() {
     const timelineContent = document.getElementById('timelineContent');
     timelineContent.innerHTML = '';
     
+    // Update restore button state
+    if (removedPages.size === 0 && removedSearches.size === 0) {
+        disableRestoreButton();
+    } else {
+        enableRestoreButton();
+    }
+    
     // Group searches and their related pages
     const searchGroups = groupSearchesAndPages();
     
@@ -1444,8 +1451,78 @@ function loadSavedComments() {
     }
 }
 
+// Helper function to show inline confirmation buttons
+function showInlineConfirmation(originalButton, confirmCallback, isRestore = false) {
+    const originalText = originalButton.textContent;
+    const originalClass = originalButton.className;
+    
+    // Get original button dimensions
+    const originalRect = originalButton.getBoundingClientRect();
+    const originalStyles = window.getComputedStyle(originalButton);
+    const originalWidth = originalButton.offsetWidth;
+    const originalHeight = originalButton.offsetHeight;
+    
+    // Create confirmation buttons container
+    const confirmContainer = document.createElement('div');
+    confirmContainer.className = 'confirm-buttons';
+    
+    // Create confirm button (checkmark)
+    const confirmBtn = document.createElement('button');
+    confirmBtn.className = `confirm-btn confirm-yes${isRestore ? ' restore' : ''}`;
+    confirmBtn.textContent = '✓';
+    confirmBtn.title = 'Confirm';
+    
+    // Create cancel button (X)
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'confirm-btn confirm-no';
+    cancelBtn.textContent = '×';
+    cancelBtn.title = 'Cancel';
+    
+    // Size the buttons to split the original button's width
+    const buttonWidth = Math.floor(originalWidth / 2) - 2; // -2 for gap
+    const buttonHeight = originalHeight;
+    
+    confirmBtn.style.width = `${buttonWidth}px`;
+    confirmBtn.style.height = `${buttonHeight}px`;
+    confirmBtn.style.minWidth = 'auto';
+    
+    cancelBtn.style.width = `${buttonWidth}px`;
+    cancelBtn.style.height = `${buttonHeight}px`;
+    cancelBtn.style.minWidth = 'auto';
+    
+    // Add event listeners
+    confirmBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        confirmCallback();
+        // Restore original button after confirmation
+        originalButton.textContent = originalText;
+        originalButton.className = originalClass;
+        originalButton.style.display = 'inline-block';
+        confirmContainer.remove();
+    });
+    
+    cancelBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Restore original button
+        originalButton.textContent = originalText;
+        originalButton.className = originalClass;
+        originalButton.style.display = 'inline-block';
+        confirmContainer.remove();
+    });
+    
+    // Add buttons to container
+    confirmContainer.appendChild(confirmBtn);
+    confirmContainer.appendChild(cancelBtn);
+    
+    // Hide original button and insert confirmation buttons
+    originalButton.style.display = 'none';
+    originalButton.parentNode.insertBefore(confirmContainer, originalButton.nextSibling);
+}
+
 function deleteComment(eventId) {
-    if (confirm('Are you sure you want to delete this comment?')) {
+    const deleteBtn = event.target;
+    
+    showInlineConfirmation(deleteBtn, () => {
         // Save previous state for undo
         const previousComment = commentData[eventId] ? { ...commentData[eventId] } : null;
         
@@ -1464,7 +1541,7 @@ function deleteComment(eventId) {
         
         // Refresh timeline
         updateTimeline();
-    }
+    });
 }
 
 // Research summary function removed - no longer needed
@@ -2187,11 +2264,9 @@ function toggleSearchGroup(groupIndex) {
 }
 
 function removePage(pageId, page) {
-    // Get the page title, preferring metadata.title
-    const pageTitle = (page.metadata && page.metadata.title) || page.title || 'this page';
-    const confirmMessage = `Are you sure you want to remove "${pageTitle}" from view?\n\nThis won't delete the page from the original data, just hide it from this view.`;
+    const removeBtn = event.target;
     
-    if (confirm(confirmMessage)) {
+    showInlineConfirmation(removeBtn, () => {
         removedPages.add(pageId);
         
         // Track action for undo
@@ -2201,6 +2276,7 @@ function removePage(pageId, page) {
             pageData: page
         };
         enableUndoButton();
+        enableRestoreButton();
         
         // Save to localStorage
         if (sessionData && sessionData.id) {
@@ -2209,7 +2285,7 @@ function removePage(pageId, page) {
         
         // Refresh timeline
         updateTimeline();
-    }
+    });
 }
 
 function loadRemovedPages() {
@@ -2280,6 +2356,20 @@ function disableUndoButton() {
     if (undoBtn) {
         undoBtn.disabled = true;
         undoBtn.textContent = 'Undo';
+    }
+}
+
+function enableRestoreButton() {
+    const restoreBtn = document.getElementById('restorePages');
+    if (restoreBtn) {
+        restoreBtn.disabled = false;
+    }
+}
+
+function disableRestoreButton() {
+    const restoreBtn = document.getElementById('restorePages');
+    if (restoreBtn) {
+        restoreBtn.disabled = true;
     }
 }
 
@@ -2432,17 +2522,9 @@ function restoreAllRemovedPages() {
         return;
     }
     
-    let confirmMessage = 'Restore ';
-    const items = [];
-    if (pageCount > 0) {
-        items.push(`${pageCount} page${pageCount > 1 ? 's' : ''}`);
-    }
-    if (searchCount > 0) {
-        items.push(`${searchCount} search${searchCount > 1 ? 'es' : ''}`);
-    }
-    confirmMessage += items.join(' and ') + '?';
+    const restoreBtn = event.target;
     
-    if (confirm(confirmMessage)) {
+    showInlineConfirmation(restoreBtn, () => {
         // Track action for undo (store all removed items)
         lastAction = {
             type: 'restoreAll',
@@ -2453,7 +2535,8 @@ function restoreAllRemovedPages() {
         
         clearRemovedPages();
         clearRemovedSearches();
-    }
+        disableRestoreButton();
+    }, true); // true indicates this is a restore action (green button)
 }
 
 function showMetadataForm(pageId, page, buttonElement) {
@@ -2787,11 +2870,9 @@ function collapseAll() {
 }
 
 function removeSearchAndPages(groupIndex, group) {
-    const searchCount = group.searches.length;
-    const pageCount = group.pages.length;
-    const confirmMessage = `Remove ${searchCount} search${searchCount > 1 ? 'es' : ''} and ${pageCount} associated page${pageCount > 1 ? 's' : ''}?\n\nThis will hide the entire search group from view.`;
+    const removeBtn = event.target;
     
-    if (confirm(confirmMessage)) {
+    showInlineConfirmation(removeBtn, () => {
         // Mark this search group as removed
         const searchKey = `${group.engine}-${group.query}`;
         removedSearches.add(searchKey);
@@ -2810,6 +2891,7 @@ function removeSearchAndPages(groupIndex, group) {
             removedPageIds: group.pages.map((page, pageIndex) => `page-${groupIndex}-${pageIndex}`)
         };
         enableUndoButton();
+        enableRestoreButton();
         
         // Save to localStorage
         saveRemovedSearches();
@@ -2819,7 +2901,7 @@ function removeSearchAndPages(groupIndex, group) {
         
         // Refresh timeline
         updateTimeline();
-    }
+    });
 }
 
 function saveRemovedSearches() {

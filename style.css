@@ -2025,6 +2025,60 @@ h1 {
 }
 
 
+/* Inline confirmation buttons */
+.confirm-buttons {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+
+.confirm-btn {
+    padding: 4px 8px;
+    border: 1px solid;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: bold;
+    transition: all 0.2s ease;
+    min-width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.confirm-btn.confirm-yes {
+    background-color: #e74c3c;
+    color: white;
+    border-color: #e74c3c;
+}
+
+.confirm-btn.confirm-yes:hover {
+    background-color: #c0392b;
+    border-color: #c0392b;
+}
+
+.confirm-btn.confirm-yes.restore {
+    background-color: #28a745;
+    border-color: #28a745;
+}
+
+.confirm-btn.confirm-yes.restore:hover {
+    background-color: #218838;
+    border-color: #1e7e34;
+}
+
+.confirm-btn.confirm-no {
+    background-color: #6c757d;
+    color: white;
+    border-color: #6c757d;
+}
+
+.confirm-btn.confirm-no:hover {
+    background-color: #5a6268;
+    border-color: #545b62;
+}
+
 /* DOCX progress indicator */
 .docx-progress {
     display: flex;
