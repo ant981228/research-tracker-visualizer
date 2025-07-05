@@ -1190,6 +1190,54 @@ function createExpandableText(text, maxLength = 150) {
     return container;
 }
 
+// Content type mapping function for DOI API consolidation
+function mapContentType(apiType) {
+    const mapping = {
+        // CrossRef API types
+        'journal-article': 'journal-article',
+        'book-chapter': 'book-chapter',
+        'book': 'book',
+        'monograph': 'monograph',
+        'report': 'report',
+        'thesis': 'thesis',
+        'conference-paper': 'conference-paper',
+        'proceedings-article': 'proceedings-article',
+        'dataset': 'dataset',
+        'reference-entry': 'reference-entry',
+        'posted-content': 'preprint',
+        'dissertation': 'dissertation',
+        
+        // CSL JSON types
+        'article-journal': 'journal-article',
+        'article-magazine': 'article-magazine',
+        'article-newspaper': 'article-newspaper',
+        'chapter': 'book-chapter',
+        'paper-conference': 'conference-paper',
+        'webpage': 'webpage',
+        'post-weblog': 'webpage',
+        'post': 'webpage',
+        'manuscript': 'preprint',
+        'interview': 'interview',
+        'personal_communication': 'personal-communication',
+        'speech': 'speech',
+        'treaty': 'treaty',
+        'legal_case': 'legal-case',
+        'legislation': 'legislation',
+        'law-review': 'law-review',
+        'entry-dictionary': 'book-chapter',
+        'entry-encyclopedia': 'book-chapter',
+        
+        // Legacy mappings for backwards compatibility
+        'news-article': 'article-newspaper',
+        'encyclopedia-article': 'book-chapter',
+        'social-media-post': 'webpage',
+        'website': 'webpage',
+        'other': 'webpage'
+    };
+    
+    return mapping[apiType] || 'webpage';
+}
+
 // Comment functions
 function assessSourceType(page) {
     const url = page.url.toLowerCase();
@@ -1209,21 +1257,26 @@ function assessSourceType(page) {
         return normalizedDomain.includes(normalizedPattern);
     };
     
-    // Check content type from metadata first
+    // Check content type from metadata first - use mapped content type directly
     if (metadata.contentType) {
-        if (metadata.contentType === 'journal-article') return 'journal';
-        if (metadata.contentType === 'preprint') return 'preprint';
-        if (metadata.contentType === 'report') return 'report';
+        const mappedType = mapContentType(metadata.contentType);
+        return mappedType;
     }
     
     // Check for specific academic identifiers
     if (metadata.arxivId || domainMatches(domain, 'arxiv.org')) return 'preprint';
     if (metadata.doi && domainMatches(domain, 'ssrn.com')) return 'preprint';
     
-    // Government sources
+    // Legal databases - default to law review for Lexis
+    if (domainMatches(domain, 'lexis.com') || domainMatches(domain, 'lexisnexis.com') || 
+        domainMatches(domain, 'advance.lexis.com')) {
+        return 'law-review';
+    }
+    
+    // Government sources - map to report since they typically publish reports
     const normalizedDomain = domain.replace(/-/g, '.');
     if (domain.endsWith('.gov') || normalizedDomain.endsWith('.gov')) {
-        return 'government';
+        return 'report';
     }
     
     // Academic journals and publishers
@@ -1234,16 +1287,16 @@ function assessSourceType(page) {
         domainMatches(domain, 'tandfonline.com') || domainMatches(domain, 'cambridge.org') ||
         domainMatches(domain, 'oxford.ac') || domainMatches(domain, 'oup.com') ||
         domainMatches(domain, 'dukeupress.edu') || domainMatches(domain, 'doi.org')) {
-        return 'journal';
+        return 'journal-article';
     }
     
-    // Research databases
+    // Research databases - treat as reference entries
     if (domainMatches(domain, 'jstor.org') || domainMatches(domain, 'pubmed') ||
         domainMatches(domain, 'ncbi.nlm.nih.gov') || domainMatches(domain, 'scholar.google')) {
-        return 'database';
+        return 'reference-entry';
     }
     
-    // Think tanks and research organizations
+    // Think tanks and research organizations - typically publish reports
     if (domainMatches(domain, 'brookings.edu') || domainMatches(domain, 'rand.org') ||
         domainMatches(domain, 'pewresearch.org') || domainMatches(domain, 'cato.org') ||
         domainMatches(domain, 'heritage.org') || domainMatches(domain, 'urban.org') ||
@@ -1258,7 +1311,7 @@ function assessSourceType(page) {
         domainMatches(domain, 'thirdway.org') || domainMatches(domain, 'cei.org') ||
         domainMatches(domain, 'rstreet.org') || domainMatches(domain, 'aspeninstitute.org') ||
         domainMatches(domain, 'nber.org')) {
-        return 'thinktank';
+        return 'report';
     }
     
     // News organizations
@@ -1278,23 +1331,23 @@ function assessSourceType(page) {
         domain.includes('japantimes.co.jp') || domain.includes('economist.com') || 
         domain.includes('ft.com') || domain.includes('nationalreview.com') || 
         domain.includes('vox.com')) {
-        return 'news';
+        return 'article-newspaper';
     }
     
     // Science media
     if (domain.includes('scientificamerican.com') || domain.includes('sciencenews.org') ||
         domain.includes('phys.org') || domain.includes('sciencedaily.com')) {
-        return 'science-media';
+        return 'article-magazine';
     }
     
     // Encyclopedia and reference sources
     if (domain.includes('britannica.com') || domain.includes('stanford.edu/entries')) {
-        return 'encyclopedia';
+        return 'reference-entry';
     }
     
     // Wikipedia
     if (domain.includes('wikipedia.org')) {
-        return 'wikipedia';
+        return 'reference-entry';
     }
     
     // Social media
@@ -1302,40 +1355,48 @@ function assessSourceType(page) {
         domain.includes('x.com') || domain.includes('facebook.com') || 
         domain.includes('youtube.com') || domain.includes('instagram.com') || 
         domain.includes('tiktok.com')) {
-        return 'social';
+        return 'webpage';
     }
     
     // Blogs
     if (domain.includes('blogspot.com') || domain.includes('wordpress.com') ||
         domain.includes('medium.com') || domain.includes('substack.com')) {
-        return 'blog';
+        return 'webpage';
     }
     
     // University (general .edu that aren't journals or think tanks)
     if (domain.endsWith('.edu') || normalizedDomain.endsWith('.edu')) {
-        return 'university';
+        return 'webpage';
     }
     
     // Default
-    return 'website';
+    return 'webpage';
 }
 
 function getSourceTypeLabel(type) {
     const labels = {
-        'journal': 'Journal',
-        'preprint': 'Preprint',
-        'government': 'Government',
-        'thinktank': 'Think Tank',
-        'news': 'News',
-        'science-media': 'Science Media',
-        'encyclopedia': 'Encyclopedia',
-        'wikipedia': 'Wikipedia',
-        'database': 'Database',
-        'university': 'University',
-        'social': 'Social Media',
-        'blog': 'Blog',
+        'journal-article': 'Journal Article',
+        'book-chapter': 'Book Chapter',
+        'book': 'Book',
+        'monograph': 'Monograph',
         'report': 'Report',
-        'website': 'Website'
+        'thesis': 'Thesis',
+        'conference-paper': 'Conference Paper',
+        'proceedings-article': 'Proceedings Article',
+        'dataset': 'Dataset',
+        'reference-entry': 'Reference Entry',
+        'preprint': 'Preprint',
+        'dissertation': 'Dissertation',
+        'article-magazine': 'Magazine Article',
+        'article-newspaper': 'Newspaper Article',
+        'webpage': 'Webpage',
+        'interview': 'Interview',
+        'personal-communication': 'Personal Communication',
+        'speech': 'Speech',
+        'treaty': 'Treaty',
+        'legal-case': 'Legal Case',
+        'legislation': 'Legislation',
+        'law-review': 'Law Review'
     };
     return labels[type] || 'Website';
 }
@@ -2719,21 +2780,43 @@ function showMetadataForm(pageId, page, buttonElement) {
     
     const typeOptions = [
         { value: '', label: '-- Select Type --' },
-        { value: 'journal-article', label: 'Journal Article' },
-        { value: 'preprint', label: 'Preprint' },
-        { value: 'news-article', label: 'News Article' },
-        { value: 'report', label: 'Report' },
+        // Common types (alphabetized)
         { value: 'book', label: 'Book' },
-        { value: 'encyclopedia-article', label: 'Encyclopedia Article' },
-        { value: 'social-media-post', label: 'Social Media Post' },
-        { value: 'website', label: 'Website' },
-        { value: 'other', label: 'Other' }
+        { value: 'book-chapter', label: 'Book Chapter' },
+        { value: 'journal-article', label: 'Journal Article' },
+        { value: 'article-newspaper', label: 'Newspaper Article' },
+        { value: 'report', label: 'Report' },
+        { value: 'webpage', label: 'Webpage' },
+        // Divider
+        { value: '', label: '──────────────────────', disabled: true },
+        // All other types (alphabetized)
+        { value: 'conference-paper', label: 'Conference Paper' },
+        { value: 'dataset', label: 'Dataset' },
+        { value: 'dissertation', label: 'Dissertation' },
+        { value: 'interview', label: 'Interview' },
+        { value: 'law-review', label: 'Law Review' },
+        { value: 'legal-case', label: 'Legal Case' },
+        { value: 'legislation', label: 'Legislation' },
+        { value: 'article-magazine', label: 'Magazine Article' },
+        { value: 'monograph', label: 'Monograph' },
+        { value: 'personal-communication', label: 'Personal Communication' },
+        { value: 'preprint', label: 'Preprint' },
+        { value: 'proceedings-article', label: 'Proceedings Article' },
+        { value: 'reference-entry', label: 'Reference Entry' },
+        { value: 'speech', label: 'Speech' },
+        { value: 'thesis', label: 'Thesis' },
+        { value: 'treaty', label: 'Treaty' }
     ];
     
     typeOptions.forEach(opt => {
         const option = document.createElement('option');
         option.value = opt.value;
         option.textContent = opt.label;
+        if (opt.disabled) {
+            option.disabled = true;
+            option.style.color = '#999';
+            option.style.textAlign = 'center';
+        }
         if ((edited.contentType || original.contentType || '') === opt.value) {
             option.selected = true;
         }
