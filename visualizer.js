@@ -6,6 +6,7 @@ let removedSearches = new Set(); // Store removed searches
 let lastAction = null; // For undo functionality
 let editedMetadata = {}; // Store edited metadata
 let unlinkedCards = new Set(); // Store unlinked card-page combinations (format: "cardIndex-pageUrl")
+let importedCardMatchingHistory = null; // Store card matching history from imported JSON
 
 // Sample data for demonstration
 const sampleData = {
@@ -509,6 +510,16 @@ function processSessionData() {
     if (sessionData.teacherComments) {
         commentData = { ...sessionData.teacherComments };
         console.log('Loaded teacher comments from JSON:', Object.keys(commentData).length, 'comments');
+    }
+    
+    // Load card matching history if available
+    if (sessionData.cardMatchingHistory) {
+        importedCardMatchingHistory = sessionData.cardMatchingHistory;
+        console.log('Loaded card matching history:', 
+            importedCardMatchingHistory.unlinkedCards.length, 'unlinked cards,',
+            importedCardMatchingHistory.manualCardMoves.length, 'manual moves');
+    } else {
+        importedCardMatchingHistory = null;
     }
     
     // Load saved data for this session (this will override JSON comments if localStorage has newer data)
@@ -2970,6 +2981,56 @@ function exportModifiedData() {
     // Add teacher comments as a new field
     modifiedData.teacherComments = commentData;
     
+    // Add card matching history BEFORE removing cards from pages
+    const cardMatchingHistory = {
+        unlinkedCards: [], // Will be populated with card signatures
+        manualCardMoves: []
+    };
+    
+    // Convert unlinkedCards to use card signatures
+    unlinkedCards.forEach(unlinkedKey => {
+        const [cardIndexStr, pageUrl] = unlinkedKey.split('-');
+        const cardIndex = parseInt(cardIndexStr);
+        
+        // Find the card in parsedCards to get its content
+        if (parsedCards[cardIndex]) {
+            const card = parsedCards[cardIndex];
+            cardMatchingHistory.unlinkedCards.push({
+                cardSignature: createCardSignature(card),
+                pageUrl: pageUrl
+            });
+        }
+    });
+    
+    // Track manual card moves by iterating through pages and finding manually moved cards
+    modifiedData.contentPages.forEach((page) => {
+        if (page.cards) {
+            page.cards.forEach((card) => {
+                if (card.matchDetails && card.matchDetails.weightingMethod === 'Manual') {
+                    // Find the original card in parsedCards to get minimal info
+                    const originalCard = parsedCards[card.cardIndex];
+                    if (originalCard) {
+                        cardMatchingHistory.manualCardMoves.push({
+                            cardHeader: originalCard.header,
+                            cardText: originalCard.contentText || originalCard.text,
+                            cardIndex: card.cardIndex,
+                            targetPageUrl: page.url,
+                            matchScore: card.matchScore,
+                            matchDetails: card.matchDetails
+                        });
+                    }
+                }
+            });
+        }
+    });
+    
+    modifiedData.cardMatchingHistory = cardMatchingHistory;
+    
+    // Remove cards from all pages to keep JSON small
+    modifiedData.contentPages.forEach((page) => {
+        delete page.cards;
+    });
+    
     // Export the modified data
     const blob = new Blob([JSON.stringify(modifiedData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -3250,6 +3311,60 @@ function calculateMatchScore(text, searchTerms, positionWeight = true, cutoffPos
     return totalScore;
 }
 
+// Function to create a unique signature for a card based on its content
+function createCardSignature(card) {
+    // Use header and first/last portions of content to create a signature
+    const headerNorm = card.header ? card.header.trim().toLowerCase() : '';
+    const fullText = (card.contentText || card.text || '').trim().toLowerCase();
+    
+    // Get first 100 and last 100 characters
+    const first100 = fullText.substring(0, 100);
+    const last100 = fullText.length > 100 ? fullText.substring(fullText.length - 100) : '';
+    
+    return `${headerNorm}|||${first100}|||${last100}`;
+}
+
+// Function to find matching card from imported history
+function findMatchingCardFromHistory(currentCard) {
+    if (!importedCardMatchingHistory || !importedCardMatchingHistory.manualCardMoves) {
+        return null;
+    }
+    
+    const currentSignature = createCardSignature(currentCard);
+    
+    // Look for a matching card in the manual moves
+    for (const move of importedCardMatchingHistory.manualCardMoves) {
+        const moveSignature = createCardSignature({
+            header: move.cardHeader,
+            contentText: move.cardText
+        });
+        
+        if (currentSignature === moveSignature) {
+            return move;
+        }
+    }
+    
+    return null;
+}
+
+// Function to check if a card was unlinked from a specific page
+function wasCardUnlinked(card, pageUrl) {
+    if (!importedCardMatchingHistory || !importedCardMatchingHistory.unlinkedCards) {
+        return false;
+    }
+    
+    const cardSignature = createCardSignature(card);
+    
+    // Check if this card-page combination was unlinked
+    for (const unlinkedEntry of importedCardMatchingHistory.unlinkedCards) {
+        if (unlinkedEntry.cardSignature === cardSignature && unlinkedEntry.pageUrl === pageUrl) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
 // Function to match cards to pages
 function matchCardsToPages() {
     if (!sessionData || !sessionData.contentPages || parsedCards.length === 0) return;
@@ -3261,6 +3376,9 @@ function matchCardsToPages() {
         page.cards = [];
     });
     
+    // Clear the unlinkedCards set since we're rebuilding from scratch
+    unlinkedCards.clear();
+    
     // Create a map to track which cards have been assigned
     const cardAssignments = new Map(); // cardIndex -> {pageIndex, score}
     
@@ -3268,6 +3386,23 @@ function matchCardsToPages() {
     parsedCards.forEach((card, cardIndex) => {
         const cardText = card.contentText;
         const cardHeader = card.header;
+        
+        // First, check if this card has a manual assignment from imported history
+        const manualAssignment = findMatchingCardFromHistory(card);
+        if (manualAssignment) {
+            // Find the page with the matching URL
+            const targetPageIndex = sessionData.contentPages.findIndex(p => p.url === manualAssignment.targetPageUrl);
+            if (targetPageIndex !== -1) {
+                console.log(`Restoring manual assignment for card "${cardHeader}" to page ${manualAssignment.targetPageUrl}`);
+                cardAssignments.set(cardIndex, {
+                    pageIndex: targetPageIndex,
+                    score: manualAssignment.matchScore,
+                    page: sessionData.contentPages[targetPageIndex],
+                    matchDetails: manualAssignment.matchDetails
+                });
+                return; // Skip automatic matching for this card
+            }
+        }
         
         // Detect URL in card text - look for http:// or https://
         const urlRegex = /https?:\/\/[^\s]+/;
@@ -3283,6 +3418,12 @@ function matchCardsToPages() {
         
         // Score each page
         const pageScores = sessionData.contentPages.map((page, pageIndex) => {
+            // First check if this card was unlinked from this page
+            if (wasCardUnlinked(card, page.url)) {
+                // Skip this page - the card was manually unlinked from it
+                return { pageIndex, page, score: 0, matchDetails: null };
+            }
+            
             let score = 0;
             const matchDetails = {
                 urlMatch: false,
@@ -3487,6 +3628,20 @@ function matchCardsToPages() {
         }
     });
     console.log('Card matching complete. Total matches:', totalMatches);
+    
+    // Restore unlinked cards tracking based on imported history
+    if (importedCardMatchingHistory && importedCardMatchingHistory.unlinkedCards) {
+        parsedCards.forEach((card, cardIndex) => {
+            const cardSignature = createCardSignature(card);
+            importedCardMatchingHistory.unlinkedCards.forEach(unlinkedEntry => {
+                if (unlinkedEntry.cardSignature === cardSignature) {
+                    // Add to current unlinkedCards set using the new card index
+                    unlinkedCards.add(`${cardIndex}-${unlinkedEntry.pageUrl}`);
+                }
+            });
+        });
+        console.log('Restored unlinked cards:', unlinkedCards.size);
+    }
     
     // Update the timeline to reflect card counts
     updateTimeline();
