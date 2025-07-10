@@ -147,19 +147,26 @@
         </div>
     </div>
 
-    <!-- Modal for DOI input -->
+    <!-- Modal for Smart Lookup (DOI, ISBN, PMID, arXiv, etc.) -->
     <div id="doiInputModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
-                <h3>Fill Metadata from DOI</h3>
+                <h3>Smart Metadata Lookup</h3>
                 <button class="close-doi-modal">&times;</button>
             </div>
             <div class="doi-input-container">
-                <label for="doiInput">Enter DOI:</label>
-                <input type="text" id="doiInput" placeholder="10.xxxx/xxxxx" style="width: 100%; box-sizing: border-box; margin: 10px 0;">
-                <div class="doi-help-text" style="font-size: 0.9em; color: #666; margin-bottom: 15px;">
-                    Enter the DOI (Digital Object Identifier) to automatically fetch metadata. Example: 10.1038/nature12373
+                <label for="doiInput">Enter identifier:</label>
+                <input type="text" id="doiInput" placeholder="DOI, ISBN, PMID, or arXiv ID" style="width: 100%; box-sizing: border-box; margin: 10px 0;">
+                <div class="doi-help-text" style="font-size: 0.9em; color: #666; margin-bottom: 10px;">
+                    Examples:
+                    <ul style="margin: 5px 0; padding-left: 20px;">
+                        <li>DOI: 10.1038/nature12373</li>
+                        <li>ISBN: 978-0-596-52068-7</li>
+                        <li>PMID: 26360422</li>
+                        <li>arXiv: 1501.00001</li>
+                    </ul>
                 </div>
+                <div id="identifierType" style="font-size: 0.9em; color: #007bff; margin-bottom: 10px; display: none;"></div>
                 <div id="doiStatus" class="doi-status" style="margin: 10px 0; min-height: 20px; display: none;"></div>
                 <div class="modal-buttons">
                     <button id="fetchDoiBtn" class="fetch-doi-btn">Fetch Metadata</button>
