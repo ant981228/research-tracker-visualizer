@@ -608,6 +608,7 @@ function updateTimeline() {
     });
     
     // Add orphaned pages (pages without a source search, excluding removed and filtered pages)
+    // Also handle case where there are no searches at all - all pages should be treated as direct visits
     const orphanedPages = sessionData.contentPages.filter(page => !page.sourceSearch && !shouldFilterPage(page));
     const orphanedPagesFiltered = [];
     orphanedPages.forEach((page, index) => {
@@ -617,7 +618,36 @@ function updateTimeline() {
         }
     });
     
-    if (showPages && orphanedPagesFiltered.length > 0) {
+    // If there are no searches at all, treat all pages as direct visits
+    if ((!sessionData.searches || sessionData.searches.length === 0) && sessionData.contentPages && sessionData.contentPages.length > 0) {
+        const allPagesFiltered = [];
+        sessionData.contentPages.forEach((page, index) => {
+            if (!shouldFilterPage(page)) {
+                const pageId = `direct-${index}`;
+                if (!removedPages.has(pageId)) {
+                    allPagesFiltered.push({ page, pageId });
+                }
+            }
+        });
+        
+        if (showPages && allPagesFiltered.length > 0) {
+            const directContainer = document.createElement('div');
+            directContainer.className = 'search-group';
+            
+            const directHeader = document.createElement('div');
+            directHeader.className = 'orphan-header';
+            directHeader.innerHTML = '<strong>Direct Page Visits</strong>';
+            directContainer.appendChild(directHeader);
+            
+            allPagesFiltered.forEach(({ page, pageId }) => {
+                const pageItem = createPageItem(page, pageId, showNotes, showComments, showMetadata);
+                directContainer.appendChild(pageItem);
+            });
+            
+            timelineContent.appendChild(directContainer);
+        }
+    } else if (showPages && orphanedPagesFiltered.length > 0) {
+        // Normal case: show orphaned pages when there are searches
         const orphanContainer = document.createElement('div');
         orphanContainer.className = 'search-group';
         
@@ -2754,7 +2784,7 @@ function showMetadataForm(pageId, page, buttonElement) {
     const doiInput = document.createElement('input');
     doiInput.type = 'text';
     doiInput.className = 'metadata-input';
-    doiInput.value = edited.doi || original.doi || '';
+    doiInput.value = getDOI(edited) || getDOI(original) || '';
     doiInput.placeholder = '10.xxxx/xxxxx';
     doiGroup.appendChild(doiInput);
     leftColumn.appendChild(doiGroup);
@@ -2836,7 +2866,7 @@ function showMetadataForm(pageId, page, buttonElement) {
     saveBtn.className = 'save-metadata-btn';
     saveBtn.textContent = 'Save';
     saveBtn.onclick = () => {
-        const newMetadata = {
+        let newMetadata = {
             title: titleInput.value.trim(),
             author: authorInput.value.trim(),
             publishDate: dateInput.value.trim(),
@@ -2844,29 +2874,75 @@ function showMetadataForm(pageId, page, buttonElement) {
             journal: journalInput.value.trim(),
             publicationInfo: pubInfoInput.value.trim(),
             pages: pagesInput.value.trim(),
-            doi: doiInput.value.trim(),
             quals: qualsInput.value.trim(),
             contentType: typeSelect.value
         };
+        
+        // Handle DOI using new identifier system (with backward compatibility)
+        const doiValue = doiInput.value.trim();
+        if (doiValue) {
+            newMetadata = setDOI(newMetadata, doiValue);
+        }
         
         // Handle authors as array if multiple authors separated by commas
         if (newMetadata.author && newMetadata.author.includes(',')) {
             newMetadata.authors = newMetadata.author.split(',').map(a => a.trim());
         }
         
-        // Preserve existing metadata flags (extractorType, extractorSite, doiMetadata, etc.)
+        // Preserve existing metadata flags and identifiers
         const existingMetadata = { ...original, ...edited };
         if (existingMetadata.extractorType) newMetadata.extractorType = existingMetadata.extractorType;
         if (existingMetadata.extractorSite) newMetadata.extractorSite = existingMetadata.extractorSite;
-        if (existingMetadata.doiMetadata) newMetadata.doiMetadata = existingMetadata.doiMetadata;
+        if (existingMetadata.doiMetadata) newMetadata.doiMetadata = existingMetadata.doiMetadata; // Keep for backward compatibility
         if (existingMetadata.created) newMetadata.created = existingMetadata.created;
         if (existingMetadata.lastUpdated) newMetadata.lastUpdated = existingMetadata.lastUpdated;
         
-        // Check if this form was filled from DOI and mark accordingly
+        // Preserve existing identifiers and source tracking
+        if (existingMetadata.identifiers) {
+            // Merge existing identifiers with any new ones, avoiding duplicates
+            const existingIds = existingMetadata.identifiers || [];
+            const newIds = newMetadata.identifiers || [];
+            const mergedIdentifiers = [...existingIds];
+            
+            // Add new identifiers that don't already exist
+            newIds.forEach(newId => {
+                if (!mergedIdentifiers.find(existing => existing.type === newId.type)) {
+                    mergedIdentifiers.push(newId);
+                }
+            });
+            
+            newMetadata.identifiers = mergedIdentifiers;
+        }
+        // Only preserve existing sourceIdentifier if new metadata doesn't have one
+        if (existingMetadata.sourceIdentifier && !newMetadata.sourceIdentifier) {
+            newMetadata.sourceIdentifier = existingMetadata.sourceIdentifier;
+        }
+        
+        // Check if this form was filled from smart lookup and mark accordingly
         if (modal.dataset.filledFromDoi === 'true') {
-            newMetadata.doiMetadata = true;
-            // Clear the flag
+            newMetadata.doiMetadata = true; // Keep for backward compatibility
+            
+            // Retrieve sourceIdentifier and identifiers from the fetched metadata
+            if (modal._fetchedMetadata) {
+                if (modal._fetchedMetadata.sourceIdentifier) {
+                    newMetadata.sourceIdentifier = modal._fetchedMetadata.sourceIdentifier;
+                }
+                if (modal._fetchedMetadata.identifiers) {
+                    newMetadata.identifiers = modal._fetchedMetadata.identifiers;
+                }
+            }
+            
+            // Fallback to DOI if no sourceIdentifier from fetch
+            if (!newMetadata.sourceIdentifier) {
+                const doiValue = getDOI(newMetadata);
+                if (doiValue) {
+                    newMetadata.sourceIdentifier = { type: 'DOI', value: doiValue };
+                }
+            }
+            
+            // Clear the flags
             delete modal.dataset.filledFromDoi;
+            delete modal._fetchedMetadata;
         }
         
         // Mark as manually edited
@@ -5167,6 +5243,53 @@ function loadSavedSidebarState() {
     }
 }
 
+// Universal Identifier Management
+function createIdentifierArray(identifierType, identifierValue) {
+    return [{ type: identifierType, value: identifierValue }];
+}
+
+function addIdentifierToMetadata(metadata, identifierType, identifierValue) {
+    if (!metadata.identifiers) {
+        metadata.identifiers = [];
+    }
+    
+    // Remove existing identifier of same type
+    metadata.identifiers = metadata.identifiers.filter(id => id.type !== identifierType);
+    
+    // Add new identifier
+    if (identifierValue) {
+        metadata.identifiers.push({ type: identifierType, value: identifierValue });
+    }
+    
+    return metadata;
+}
+
+function getIdentifierByType(metadata, identifierType) {
+    if (!metadata.identifiers) return null;
+    const identifier = metadata.identifiers.find(id => id.type === identifierType);
+    return identifier ? identifier.value : null;
+}
+
+function hasIdentifier(metadata, identifierType) {
+    return getIdentifierByType(metadata, identifierType) !== null;
+}
+
+function getAllIdentifiers(metadata) {
+    return metadata.identifiers || [];
+}
+
+// Backward compatibility: get DOI from either new or old format
+function getDOI(metadata) {
+    return getIdentifierByType(metadata, 'DOI') || metadata.doi || null;
+}
+
+// Backward compatibility: set DOI in both new and old format
+function setDOI(metadata, doiValue) {
+    addIdentifierToMetadata(metadata, 'DOI', doiValue);
+    metadata.doi = doiValue; // Keep for backward compatibility
+    return metadata;
+}
+
 // Smart Identifier Detection
 function detectIdentifierType(input) {
     const trimmed = input.trim();
@@ -5427,7 +5550,7 @@ async function fetchDOIMetadata(doi) {
 function convertCrossRefToMetadata(crossrefData, doi) {
     try {
         const metadata = {
-            doi: doi,
+            doi: doi, // Keep for backward compatibility
             title: crossrefData.title ? crossrefData.title[0] : null,
             authors: [],
             publishDate: null,
@@ -5436,7 +5559,9 @@ function convertCrossRefToMetadata(crossrefData, doi) {
             pages: crossrefData.page,
             abstract: crossrefData.abstract,
             contentType: mapCrossRefTypeToContentType(crossrefData.type),
-            doiMetadata: true  // Flag to indicate this came from DOI API
+            doiMetadata: true, // Keep for backward compatibility
+            sourceIdentifier: { type: 'DOI', value: doi },
+            identifiers: [{ type: 'DOI', value: doi }]
         };
         
         // Create publication info from volume and issue
@@ -5493,7 +5618,7 @@ function convertCSLToMetadata(data, doi) {
     try {
         // Convert CSL JSON to our metadata format
         const metadata = {
-            doi: doi,
+            doi: doi, // Keep for backward compatibility
             title: data.title,
             authors: [],
             publishDate: null,
@@ -5502,7 +5627,9 @@ function convertCSLToMetadata(data, doi) {
             pages: data.page,
             abstract: data.abstract,
             contentType: mapCSLTypeToContentType(data.type),
-            doiMetadata: true  // Flag to indicate this came from DOI API
+            doiMetadata: true, // Keep for backward compatibility
+            sourceIdentifier: { type: 'DOI', value: doi },
+            identifiers: [{ type: 'DOI', value: doi }]
         };
         
         // Create publication info from volume and issue
@@ -5640,9 +5767,11 @@ function convertOpenLibraryToMetadata(data, isbn) {
         publishDate: '',
         publisher: '',
         pages: '',
-        isbn: isbn,
+        isbn: isbn, // Keep for backward compatibility
         contentType: 'book',
-        isbnMetadata: true
+        isbnMetadata: true, // Keep for backward compatibility
+        sourceIdentifier: { type: 'ISBN', value: isbn },
+        identifiers: [{ type: 'ISBN', value: isbn }]
     };
     
     // Process authors
@@ -5676,9 +5805,11 @@ function convertGoogleBooksToMetadata(data, isbn) {
         publishDate: '',
         publisher: volumeInfo.publisher || '',
         pages: '',
-        isbn: isbn,
+        isbn: isbn, // Keep for backward compatibility
         contentType: 'book',
-        isbnMetadata: true
+        isbnMetadata: true, // Keep for backward compatibility
+        sourceIdentifier: { type: 'ISBN', value: isbn },
+        identifiers: [{ type: 'ISBN', value: isbn }]
     };
     
     // Process authors
@@ -5730,9 +5861,11 @@ function convertPubMedToMetadata(data, pmid) {
         journal: data.fulljournalname || data.source || '',
         publicationInfo: '',
         pages: data.pages || '',
-        pmid: pmid,
+        pmid: pmid, // Keep for backward compatibility
         contentType: 'journal-article',
-        pmidMetadata: true
+        pmidMetadata: true, // Keep for backward compatibility
+        sourceIdentifier: { type: 'PMID', value: pmid },
+        identifiers: [{ type: 'PMID', value: pmid }]
     };
     
     // Process authors
@@ -5759,7 +5892,10 @@ function convertPubMedToMetadata(data, pmid) {
     if (data.elocationid) {
         const doiMatch = data.elocationid.match(/doi:\s*(.+)/);
         if (doiMatch) {
-            metadata.doi = doiMatch[1];
+            const doiValue = doiMatch[1];
+            metadata.doi = doiValue; // Keep for backward compatibility
+            // Add DOI to identifiers array
+            metadata.identifiers.push({ type: 'DOI', value: doiValue });
         }
     }
     
@@ -5798,9 +5934,11 @@ function convertArxivToMetadata(entry, arxivId) {
         title: '',
         author: '',
         publishDate: '',
-        arxivId: arxivId,
+        arxivId: arxivId, // Keep for backward compatibility
         contentType: 'preprint',
-        arxivMetadata: true
+        arxivMetadata: true, // Keep for backward compatibility
+        sourceIdentifier: { type: 'arXiv', value: arxivId },
+        identifiers: [{ type: 'arXiv', value: arxivId }]
     };
     
     // Get title
@@ -5840,14 +5978,20 @@ function fillMetadataForm(metadata, formInputs) {
     if (metadata.journal) formInputs.journalInput.value = metadata.journal;
     if (metadata.publicationInfo) formInputs.pubInfoInput.value = metadata.publicationInfo;
     if (metadata.pages) formInputs.pagesInput.value = metadata.pages;
-    if (metadata.doi) formInputs.doiInput.value = metadata.doi;
+    
+    // Handle DOI field - check both new and old formats
+    const doiValue = getDOI(metadata);
+    if (doiValue) formInputs.doiInput.value = doiValue;
+    
     if (metadata.contentType) formInputs.typeSelect.value = metadata.contentType;
     
-    // Mark that this form was filled from DOI (store on form container for save function to check)
-    if (metadata.doiMetadata) {
+    // Mark that this form was filled from smart lookup (store on form container for save function to check)
+    if (metadata.doiMetadata || metadata.sourceIdentifier) {
         const modal = document.getElementById('metadataModal');
         if (modal) {
             modal.dataset.filledFromDoi = 'true';
+            // Store the complete fetched metadata for the save function to access
+            modal._fetchedMetadata = metadata;
         }
     }
     
@@ -5858,8 +6002,22 @@ function createMetadataStatusIndicators(originalMetadata, editedMetadata) {
     const metadata = { ...originalMetadata, ...editedMetadata };
     const infoItems = [];
     
-    // Check if metadata came from DOI API
-    if (metadata.doiMetadata) {
+    // Check if metadata came from identifier API
+    if (metadata.sourceIdentifier) {
+        const sourceType = metadata.sourceIdentifier.type;
+        const sourceText = sourceType === 'DOI' ? 'DOI registry' :
+                          sourceType === 'ISBN' ? 'ISBN database' :
+                          sourceType === 'PMID' ? 'PubMed database' :
+                          sourceType === 'arXiv' ? 'arXiv repository' :
+                          `${sourceType} database`;
+        infoItems.push({
+            text: `Metadata fetched from ${sourceText}`,
+            color: '#2e7d32',
+            icon: '✓'
+        });
+    }
+    // Backward compatibility for old doiMetadata flag
+    else if (metadata.doiMetadata) {
         infoItems.push({
             text: 'Metadata fetched from DOI registry',
             color: '#2e7d32',
