@@ -795,7 +795,7 @@ function createTimelineItem(event, index) {
             if (event.metadata.doi) {
                 const doiDiv = document.createElement('div');
                 doiDiv.className = 'metadata-item';
-                doiDiv.innerHTML = `<span class="metadata-label">DOI:</span><span class="metadata-value">${event.metadata.doi}</span>`;
+                doiDiv.innerHTML = `<span class="metadata-label">Identifier:</span><span class="metadata-value">${event.metadata.doi}</span>`;
                 metadataSection.appendChild(doiDiv);
             }
             
@@ -2780,12 +2780,12 @@ function showMetadataForm(pageId, page, buttonElement) {
     // DOI field
     const doiGroup = document.createElement('div');
     doiGroup.className = 'form-group';
-    doiGroup.innerHTML = '<label>DOI:</label>';
+    doiGroup.innerHTML = '<label>Identifier:</label>';
     const doiInput = document.createElement('input');
     doiInput.type = 'text';
     doiInput.className = 'metadata-input';
     doiInput.value = getDOI(edited) || getDOI(original) || '';
-    doiInput.placeholder = '10.xxxx/xxxxx';
+    doiInput.placeholder = 'DOI, ISBN, PMID, arXiv ID, etc.';
     doiGroup.appendChild(doiInput);
     leftColumn.appendChild(doiGroup);
     
@@ -4227,7 +4227,7 @@ function updatePageMetadataDisplay(page, pageId) {
         { key: 'publishDate', label: 'Published' },
         { key: 'journal', label: 'Journal' },
         { key: 'publisher', label: 'Publisher' },
-        { key: 'doi', label: 'DOI' },
+        { key: 'doi', label: 'Identifier' },
         { key: 'contentType', label: 'Type' }
     ];
     
@@ -5278,15 +5278,44 @@ function getAllIdentifiers(metadata) {
     return metadata.identifiers || [];
 }
 
-// Backward compatibility: get DOI from either new or old format
+// Get primary identifier from either new format (sourceIdentifier) or old format (doi field)
 function getDOI(metadata) {
-    return getIdentifierByType(metadata, 'DOI') || metadata.doi || null;
+    // First check if we have a sourceIdentifier (new format)
+    if (metadata.sourceIdentifier && metadata.sourceIdentifier.value) {
+        return metadata.sourceIdentifier.value;
+    }
+    // Then check if it's a DOI in the new identifiers array
+    const doiFromArray = getIdentifierByType(metadata, 'DOI');
+    if (doiFromArray) {
+        return doiFromArray;
+    }
+    // Finally fall back to the legacy doi field
+    return metadata.doi || null;
 }
 
-// Backward compatibility: set DOI in both new and old format
-function setDOI(metadata, doiValue) {
-    addIdentifierToMetadata(metadata, 'DOI', doiValue);
-    metadata.doi = doiValue; // Keep for backward compatibility
+// Set identifier in both new and old format (handles any identifier type)
+function setDOI(metadata, identifierValue) {
+    if (!identifierValue) {
+        // Clear identifier fields
+        metadata.doi = '';
+        metadata.sourceIdentifier = null;
+        return metadata;
+    }
+    
+    // Detect identifier type
+    const detected = detectIdentifierType(identifierValue);
+    if (detected) {
+        // Set new format
+        addIdentifierToMetadata(metadata, detected.type, detected.identifier);
+        metadata.sourceIdentifier = { type: detected.type, value: detected.identifier };
+        // Set legacy format for backward compatibility
+        metadata.doi = detected.identifier;
+    } else {
+        // Unknown identifier type, treat as generic
+        metadata.doi = identifierValue;
+        metadata.sourceIdentifier = { type: 'Unknown', value: identifierValue };
+    }
+    
     return metadata;
 }
 
