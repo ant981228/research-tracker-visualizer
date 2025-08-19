@@ -457,7 +457,6 @@ h1 {
     padding: 4px 10px;
     font-size: 12px;
     cursor: pointer;
-    margin-top: 5px;
     transition: background-color 0.3s;
 }
 
@@ -467,6 +466,31 @@ h1 {
 
 .unload-docx-btn.hidden {
     display: none;
+}
+
+.view-unmatched-btn {
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.view-unmatched-btn:hover {
+    background-color: #5a6268;
+}
+
+.view-unmatched-btn.hidden {
+    display: none;
+}
+
+.docx-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 5px;
 }
 
 /* Actions box styles */
@@ -1391,7 +1415,7 @@ h1 {
     font-weight: 600;
 }
 
-#cardsNavList {
+#cardsNavList, #unmatchedCardsNav {
     list-style: none;
     padding: 0;
     margin: 0;
@@ -1501,6 +1525,22 @@ h1 {
 
 .unlink-card-btn:hover {
     background-color: #c0392b;
+}
+
+.unlink-all-card-btn {
+    margin-left: 8px;
+    padding: 4px 12px;
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background-color 0.3s;
+}
+
+.unlink-all-card-btn:hover {
+    background-color: #c82333;
 }
 
 /* Font selector styles */
@@ -2251,4 +2291,5 @@ h1 {
     animation: none;
     color: #28a745;
 }
+
 

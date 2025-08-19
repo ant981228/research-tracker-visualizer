@@ -6,6 +6,7 @@ let removedSearches = new Set(); // Store removed searches
 let lastAction = null; // For undo functionality
 let editedMetadata = {}; // Store edited metadata
 let unlinkedCards = new Set(); // Store unlinked card-page combinations (format: "cardIndex-pageUrl")
+let unlinkedFromAllCards = new Set(); // Store cards that are unlinked from all pages (format: "cardIndex")
 let importedCardMatchingHistory = null; // Store card matching history from imported JSON
 
 // Sample data for demonstration
@@ -417,6 +418,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Unload buttons
     document.getElementById('unloadDOCX').addEventListener('click', unloadDOCX);
     document.getElementById('unloadJSON').addEventListener('click', unloadJSON);
+    document.getElementById('viewUnmatchedCards').addEventListener('click', showUnmatchedCardsModal);
     
     // Tab switching
     document.querySelectorAll('.tab-button').forEach(function(button) {
@@ -489,6 +491,15 @@ function loadSampleData() {
     document.getElementById('fileInputName').textContent = 'No JSON file chosen';
     
     sessionData = sampleData;
+    
+    // Clear localStorage for sample data to ensure clean reset every time
+    if (sessionData.id) {
+        localStorage.removeItem(`edited-metadata-${sessionData.id}`);
+        localStorage.removeItem(`comments-${sessionData.id}`);
+        localStorage.removeItem(`removed-pages-${sessionData.id}`);
+        localStorage.removeItem(`removed-searches-${sessionData.id}`);
+    }
+    
     // Build chronological events from searches and pages
     sessionData.chronologicalEvents = sessionData.searches.concat(sessionData.contentPages).sort(function(a, b) {
         return new Date(a.timestamp) - new Date(b.timestamp);
@@ -528,9 +539,13 @@ function processSessionData() {
     // Load card matching history if available
     if (sessionData.cardMatchingHistory) {
         importedCardMatchingHistory = sessionData.cardMatchingHistory;
+        const unlinkedCount = importedCardMatchingHistory.unlinkedCards?.length || 0;
+        const unlinkedFromAllCount = importedCardMatchingHistory.unlinkedFromAllCards?.length || 0;
+        const manualMovesCount = importedCardMatchingHistory.manualCardMoves?.length || 0;
         console.log('Loaded card matching history:', 
-            importedCardMatchingHistory.unlinkedCards.length, 'unlinked cards,',
-            importedCardMatchingHistory.manualCardMoves.length, 'manual moves');
+            unlinkedCount, 'unlinked cards,',
+            unlinkedFromAllCount, 'unlinked from all cards,',
+            manualMovesCount, 'manual moves');
     } else {
         importedCardMatchingHistory = null;
     }
@@ -2437,6 +2452,7 @@ function clearRemovedSearches() {
     updateTimeline();
 }
 
+
 function enableUndoButton() {
     const undoBtn = document.getElementById('undoBtn');
     if (undoBtn) {
@@ -2464,6 +2480,9 @@ function enableUndoButton() {
                     break;
                 case 'unlinkCard':
                     undoBtn.textContent = 'Undo Unlink';
+                    break;
+                case 'unlinkCardFromAll':
+                    undoBtn.textContent = 'Undo Unlink from All';
                     break;
                 case 'moveCard':
                     undoBtn.textContent = 'Undo Move';
@@ -2593,6 +2612,23 @@ function performUndo() {
             }
             break;
             
+        case 'unlinkCardFromAll':
+            // Restore the card to all affected pages
+            lastAction.affectedPages.forEach(({page, pageId, card}) => {
+                if (!page.cards) {
+                    page.cards = [];
+                }
+                // Add the card back
+                page.cards.push(card);
+                
+                // Sort cards by score again to maintain order
+                page.cards.sort((a, b) => b.matchScore - a.matchScore);
+            });
+            
+            // Remove from unlinked from all set
+            unlinkedFromAllCards.delete(lastAction.cardIndex.toString());
+            break;
+            
         case 'moveCard':
             // Restore card to original pages and remove from target pages
             if (lastAction.removedCardData && lastAction.addedCardData) {
@@ -2662,6 +2698,7 @@ function restoreAllRemovedPages() {
         disableRestoreButton();
     }, true); // true indicates this is a restore action (green button)
 }
+
 
 function showMetadataForm(pageId, page, buttonElement) {
     const modal = document.getElementById('metadataModal');
@@ -3165,6 +3202,7 @@ function exportModifiedData() {
     // Add card matching history BEFORE removing cards from pages
     const cardMatchingHistory = {
         unlinkedCards: [], // Will be populated with card signatures
+        unlinkedFromAllCards: [], // Will be populated with card signatures
         manualCardMoves: []
     };
     
@@ -3179,6 +3217,19 @@ function exportModifiedData() {
             cardMatchingHistory.unlinkedCards.push({
                 cardSignature: createCardSignature(card),
                 pageUrl: pageUrl
+            });
+        }
+    });
+    
+    // Convert unlinkedFromAllCards to use card signatures
+    unlinkedFromAllCards.forEach(cardIndexStr => {
+        const cardIndex = parseInt(cardIndexStr);
+        
+        // Find the card in parsedCards to get its content
+        if (parsedCards[cardIndex]) {
+            const card = parsedCards[cardIndex];
+            cardMatchingHistory.unlinkedFromAllCards.push({
+                cardSignature: createCardSignature(card)
             });
         }
     });
@@ -3301,12 +3352,14 @@ function unloadDOCX() {
     // Clear unlinked cards but DO NOT clear importedCardMatchingHistory
     // This preserves manual matches and unlinks for when DOCX is reloaded
     unlinkedCards.clear();
+    unlinkedFromAllCards.clear();
     
     // Reset DOCX UI elements
     document.getElementById('docxInputName').textContent = 'No DOCX file chosen';
     document.getElementById('docxInput').value = '';
     document.getElementById('parsedSectionsLink').classList.add('hidden');
     document.getElementById('unloadDOCX').classList.add('hidden');
+    document.getElementById('viewUnmatchedCards').classList.add('hidden');
     hideDocxProgress();
     
     // Update timeline to reflect no cards
@@ -3440,15 +3493,18 @@ function hideDocxProgress() {
 function updateParsedSectionsUI() {
     const link = document.getElementById('parsedSectionsLink');
     const unloadBtn = document.getElementById('unloadDOCX');
+    const viewUnmatchedBtn = document.getElementById('viewUnmatchedCards');
     const sectionCount = parsedSections.length;
     
     if (sectionCount > 0) {
         link.textContent = `Parsed ${sectionCount} Section${sectionCount !== 1 ? 's' : ''}`;
         link.classList.remove('hidden');
         unloadBtn.classList.remove('hidden');
+        viewUnmatchedBtn.classList.remove('hidden');
     } else {
         link.classList.add('hidden');
         unloadBtn.classList.add('hidden');
+        viewUnmatchedBtn.classList.add('hidden');
     }
 }
 
@@ -3618,6 +3674,24 @@ function wasCardUnlinked(card, pageUrl) {
     return false;
 }
 
+// Function to check if a card was unlinked from all pages
+function wasCardUnlinkedFromAll(card) {
+    if (!importedCardMatchingHistory || !importedCardMatchingHistory.unlinkedFromAllCards) {
+        return false;
+    }
+    
+    const cardSignature = createCardSignature(card);
+    
+    // Check if this card was unlinked from all pages
+    for (const unlinkedEntry of importedCardMatchingHistory.unlinkedFromAllCards) {
+        if (unlinkedEntry.cardSignature === cardSignature) {
+            return true;
+        }
+    }
+    
+    return false;
+}
+
 // Function to match cards to pages
 function matchCardsToPages() {
     if (!sessionData || !sessionData.contentPages || parsedCards.length === 0) return;
@@ -3632,11 +3706,25 @@ function matchCardsToPages() {
     // Clear the unlinkedCards set since we're rebuilding from scratch
     unlinkedCards.clear();
     
+    // Clear the unlinkedFromAllCards set and populate it from imported history
+    unlinkedFromAllCards.clear();
+    if (importedCardMatchingHistory && importedCardMatchingHistory.unlinkedFromAllCards) {
+        parsedCards.forEach((card, cardIndex) => {
+            if (wasCardUnlinkedFromAll(card)) {
+                unlinkedFromAllCards.add(cardIndex.toString());
+            }
+        });
+    }
+    
     // Create a map to track which cards have been assigned
     const cardAssignments = new Map(); // cardIndex -> {pageIndex, score}
     
     // For each card, find the best matching pages
     parsedCards.forEach((card, cardIndex) => {
+        // Skip cards that are unlinked from all pages
+        if (unlinkedFromAllCards.has(cardIndex.toString())) {
+            return;
+        }
         const cardText = card.contentText;
         const cardHeader = card.header;
         
@@ -3671,7 +3759,13 @@ function matchCardsToPages() {
         
         // Score each page
         const pageScores = sessionData.contentPages.map((page, pageIndex) => {
-            // First check if this card was unlinked from this page
+            // First check if this card was unlinked from all pages
+            if (unlinkedFromAllCards.has(cardIndex.toString())) {
+                // Skip this page - the card was unlinked from all pages
+                return { pageIndex, page, score: 0, matchDetails: null };
+            }
+            
+            // Check if this card was unlinked from this specific page
             if (wasCardUnlinked(card, page.url)) {
                 // Skip this page - the card was manually unlinked from it
                 return { pageIndex, page, score: 0, matchDetails: null };
@@ -4367,7 +4461,8 @@ function showCardsModal(pageId, page) {
                     </div>
                     <div class="card-actions">
                         <button class="move-card-btn" data-page-id="${pageId}" data-card-index="${card.cardIndex !== undefined ? card.cardIndex : index}" data-card-header="${card.header.replace(/"/g, '&quot;')}">Move</button>
-                        <button class="unlink-card-btn" onclick="unlinkCard('${pageId}', ${card.cardIndex !== undefined ? card.cardIndex : index})">Unlink</button>
+                        <button class="unlink-card-btn" onclick="unlinkCard('${pageId}', ${card.cardIndex !== undefined ? card.cardIndex : index})">Unlink from Page</button>
+                        <button class="unlink-all-card-btn" onclick="unlinkCardFromAll('${pageId}', ${card.cardIndex !== undefined ? card.cardIndex : index})">Unlink from All</button>
                     </div>
                 </div>
             </div>
@@ -4508,6 +4603,214 @@ function unlinkCard(pageId, cardIndex) {
     updateTimeline();
 }
 
+// Function to unlink a card from all pages
+function unlinkCardFromAll(pageId, cardIndex) {
+    // Find the source page for modal refresh
+    let targetPage = null;
+    
+    // Check if it's an orphaned page
+    if (pageId.startsWith('orphan-')) {
+        const orphanIndex = parseInt(pageId.split('-')[1]);
+        targetPage = sessionData.contentPages.filter(p => !p.sourceSearch)[orphanIndex];
+    } else {
+        // It's a grouped page
+        const [_, groupIndex, pageIndex] = pageId.split('-').map(Number);
+        const groups = groupSearchesAndPages();
+        if (groups[groupIndex] && groups[groupIndex].pages[pageIndex]) {
+            targetPage = groups[groupIndex].pages[pageIndex];
+        }
+    }
+    
+    // Add to unlinked from all set
+    unlinkedFromAllCards.add(cardIndex.toString());
+    
+    // Remove the card from all pages that have it
+    const affectedPages = [];
+    sessionData.contentPages.forEach((page, idx) => {
+        if (page.cards) {
+            const cardIndexInPage = page.cards.findIndex(c => c.cardIndex === cardIndex);
+            if (cardIndexInPage !== -1) {
+                const removedCard = page.cards[cardIndexInPage];
+                page.cards.splice(cardIndexInPage, 1);
+                
+                // Determine the pageId for this page
+                let pageId;
+                if (!page.sourceSearch) {
+                    const orphanIndex = sessionData.contentPages.filter(p => !p.sourceSearch).indexOf(page);
+                    pageId = `orphan-${orphanIndex}`;
+                } else {
+                    // Find this page in the grouped structure
+                    const groups = groupSearchesAndPages();
+                    for (let gIdx = 0; gIdx < groups.length; gIdx++) {
+                        const pIdx = groups[gIdx].pages.indexOf(page);
+                        if (pIdx !== -1) {
+                            pageId = `page-${gIdx}-${pIdx}`;
+                            break;
+                        }
+                    }
+                }
+                
+                affectedPages.push({
+                    page: page,
+                    pageId: pageId,
+                    card: removedCard
+                });
+            }
+        }
+    });
+    
+    // Track action for undo
+    lastAction = {
+        type: 'unlinkCardFromAll',
+        cardIndex: cardIndex,
+        affectedPages: affectedPages
+    };
+    enableUndoButton();
+    
+    // Update the modal and timeline (same pattern as unlinkCard)
+    if (targetPage) {
+        showCardsModal(pageId, targetPage);
+    }
+    updateTimeline();
+}
+
+// Function to show unmatched cards modal
+function showUnmatchedCardsModal() {
+    if (!parsedCards || parsedCards.length === 0) {
+        alert('No cards have been parsed from a DOCX file.');
+        return;
+    }
+    
+    // Check if modal already exists and remove it
+    const existingModal = document.getElementById('unmatchedCardsModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Get all unmatched cards (cards not linked to any page)
+    const unmatchedCards = parsedCards.filter((card, index) => {
+        // Check if card is unlinked from all
+        if (unlinkedFromAllCards.has(index.toString())) {
+            return true;
+        }
+        
+        // Check if card is linked to any page
+        let isLinkedToAnyPage = false;
+        if (sessionData && sessionData.contentPages) {
+            sessionData.contentPages.forEach(page => {
+                if (page.cards && page.cards.some(c => c.cardIndex === index)) {
+                    isLinkedToAnyPage = true;
+                }
+            });
+        }
+        
+        return !isLinkedToAnyPage;
+    });
+    
+    if (unmatchedCards.length === 0) {
+        alert('All cards are currently matched to pages.');
+        return;
+    }
+    
+    // Create the modal
+    const modal = document.createElement('div');
+    modal.id = 'unmatchedCardsModal';
+    modal.className = 'modal';
+    
+    modal.innerHTML = `
+        <div class="modal-content cards-modal-content">
+            <div class="modal-header">
+                <h3>Cards with No Match (${unmatchedCards.length})</h3>
+                <button class="close-modal" onclick="document.getElementById('unmatchedCardsModal').style.display='none'">&times;</button>
+            </div>
+            <div class="cards-modal-body">
+                <div class="cards-left-panel">
+                    <nav class="cards-nav">
+                        <h4>Cards</h4>
+                        <ul id="unmatchedCardsNav"></ul>
+                    </nav>
+                </div>
+                <div id="unmatchedCardsContent" class="cards-content-area"></div>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Close functionality (close button already has onclick in the HTML)
+    
+    window.onclick = (event) => {
+        if (event.target === modal) {
+            modal.style.display = 'none';
+        }
+    };
+    
+    // Handle escape key
+    const escapeHandler = (event) => {
+        if (event.key === 'Escape') {
+            modal.style.display = 'none';
+            document.removeEventListener('keydown', escapeHandler);
+        }
+    };
+    document.addEventListener('keydown', escapeHandler);
+    
+    // Populate cards
+    const navList = document.getElementById('unmatchedCardsNav');
+    const cardsContent = document.getElementById('unmatchedCardsContent');
+    
+    unmatchedCards.forEach((card, displayIndex) => {
+        // Get the original card index
+        const originalIndex = parsedCards.findIndex(c => c === card);
+        
+        // Create card element
+        const cardDiv = document.createElement('div');
+        cardDiv.className = 'card-item';
+        cardDiv.id = `unmatched-card-${displayIndex}`;
+        
+        // Add to navigation
+        const navItem = document.createElement('li');
+        navItem.className = 'cards-nav-item';
+        navItem.innerHTML = `<a href="#unmatched-card-${displayIndex}" onclick="document.getElementById('unmatched-card-${displayIndex}').scrollIntoView({behavior: 'smooth', block: 'start'}); return false;">${card.header}</a>`;
+        navList.appendChild(navItem);
+        
+        cardDiv.innerHTML = `
+            <div class="card-header">
+                <h4>${card.header}</h4>
+                <div class="match-info">
+                    <div class="match-details">
+                        <span class="match-status">Status: Unmatched</span>
+                    </div>
+                    <div class="card-actions">
+                        <button class="move-card-btn" data-card-index="${originalIndex}" data-card-header="${card.header.replace(/"/g, '&quot;')}">Link to Page</button>
+                    </div>
+                </div>
+            </div>
+            <div class="card-content">${card.content}</div>
+        `;
+        
+        cardsContent.appendChild(cardDiv);
+    });
+    
+    // Add event listeners for move buttons
+    const moveButtons = cardsContent.querySelectorAll('.move-card-btn');
+    moveButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const cardIndex = parseInt(this.dataset.cardIndex);
+            const cardHeader = this.dataset.cardHeader;
+            
+            // Show move card modal
+            showMoveCardModal(null, cardIndex, cardHeader, () => {
+                // Close the unmatched cards modal and refresh timeline after move
+                modal.style.display = 'none';
+                updateTimeline();
+            });
+        });
+    });
+    
+    // Show the modal
+    modal.style.display = 'block';
+}
+
 // Function to create metadata tooltip content
 function createMetadataTooltip(metadata, page) {
     const items = [];
@@ -4603,43 +4906,58 @@ function extractCardCite(card) {
 }
 
 // Function to show modal for moving a card to another page
-function showMoveCardModal(sourcePageId, cardIndex, cardHeader) {
+function showMoveCardModal(sourcePageId, cardIndex, cardHeader, successCallback) {
     // Get the card data
     let sourceCard = null;
     let sourcePage = null;
     let cardArrayIndex = -1;
     
-    // Find the source page and card
-    if (sourcePageId.startsWith('orphan-')) {
-        const orphanIndex = parseInt(sourcePageId.split('-')[1]);
-        sourcePage = sessionData.contentPages.filter(p => !p.sourceSearch)[orphanIndex];
-    } else {
-        const [_, groupIndex, pageIndex] = sourcePageId.split('-').map(Number);
-        const groups = groupSearchesAndPages();
-        if (groups[groupIndex] && groups[groupIndex].pages[pageIndex]) {
-            sourcePage = groups[groupIndex].pages[pageIndex];
-        }
-    }
-    
-    if (!sourcePage || !sourcePage.cards) {
-        alert('Source page not found.');
-        return;
-    }
-    
-    // Find the card by cardIndex (unique identifier) or use as array index for backward compatibility
-    if (typeof cardIndex === 'number' && cardIndex < sourcePage.cards.length && sourcePage.cards[cardIndex].cardIndex === undefined) {
-        // Legacy behavior: cardIndex is actually an array index
-        cardArrayIndex = cardIndex;
-    } else {
-        // New behavior: cardIndex is a unique identifier
-        cardArrayIndex = sourcePage.cards.findIndex(card => card.cardIndex === cardIndex);
-        if (cardArrayIndex === -1) {
+    // Handle case where card is unmatched (no source page)
+    if (sourcePageId === null || sourcePageId === undefined) {
+        // For unmatched cards, get the card from parsedCards
+        sourceCard = parsedCards[cardIndex];
+        cardArrayIndex = cardIndex; // For unmatched cards, use the cardIndex directly
+        if (!sourceCard) {
             alert('Card not found.');
+            return;
+        }
+    } else {
+        // Find the source page and card
+        if (sourcePageId.startsWith('orphan-')) {
+            const orphanIndex = parseInt(sourcePageId.split('-')[1]);
+            sourcePage = sessionData.contentPages.filter(p => !p.sourceSearch)[orphanIndex];
+        } else {
+            const [_, groupIndex, pageIndex] = sourcePageId.split('-').map(Number);
+            const groups = groupSearchesAndPages();
+            if (groups[groupIndex] && groups[groupIndex].pages[pageIndex]) {
+                sourcePage = groups[groupIndex].pages[pageIndex];
+            }
+        }
+        
+        if (!sourcePage || !sourcePage.cards) {
+            alert('Source page not found.');
             return;
         }
     }
     
-    sourceCard = sourcePage.cards[cardArrayIndex];
+    // Find the card by cardIndex (only for cards that are already linked to pages)
+    if (sourcePage && sourcePage.cards) {
+        if (typeof cardIndex === 'number' && cardIndex < sourcePage.cards.length && sourcePage.cards[cardIndex].cardIndex === undefined) {
+            // Legacy behavior: cardIndex is actually an array index
+            cardArrayIndex = cardIndex;
+        } else {
+            // New behavior: cardIndex is a unique identifier
+            cardArrayIndex = sourcePage.cards.findIndex(card => card.cardIndex === cardIndex);
+            if (cardArrayIndex === -1) {
+                alert('Card not found.');
+                return;
+            }
+        }
+        
+        sourceCard = sourcePage.cards[cardArrayIndex];
+    }
+    
+    // At this point, sourceCard should be set either from sourcePage.cards or directly from parsedCards
     
     // Get all available pages and calculate match scores
     const availablePages = getAllPagesWithMatchScores(sourceCard, sourcePageId);
@@ -4838,7 +5156,7 @@ function showMoveCardModal(sourcePageId, cardIndex, cardHeader) {
             const selectedPage = availablePages.find(p => p.pageId === targetPageId);
             
             if (selectedPage) {
-                moveCardToPage(sourcePageId, cardArrayIndex, targetPageId, selectedPage.matchScore, selectedPage.matchFields);
+                moveCardToPage(sourcePageId, cardArrayIndex, targetPageId, selectedPage.matchScore, selectedPage.matchFields, successCallback);
                 modal.style.display = 'none';
             }
         }
@@ -4990,23 +5308,43 @@ function getAllPagesWithMatchScores(card, excludePageId) {
 }
 
 // Function to move a card from one page to another
-function moveCardToPage(sourcePageId, cardIndex, targetPageId, matchScore, matchFields) {
+function moveCardToPage(sourcePageId, cardIndex, targetPageId, matchScore, matchFields, successCallback) {
     // Get source page and card
     let sourcePage = null;
-    if (sourcePageId.startsWith('orphan-')) {
-        const orphanIndex = parseInt(sourcePageId.split('-')[1]);
-        sourcePage = sessionData.contentPages.filter(p => !p.sourceSearch)[orphanIndex];
-    } else {
-        const [_, groupIndex, pageIndex] = sourcePageId.split('-').map(Number);
-        const groups = groupSearchesAndPages();
-        if (groups[groupIndex] && groups[groupIndex].pages[pageIndex]) {
-            sourcePage = groups[groupIndex].pages[pageIndex];
-        }
-    }
+    let sourceCard = null;
+    let cardArrayIndex = -1;
     
-    if (!sourcePage || !sourcePage.cards || !sourcePage.cards[cardIndex]) {
-        alert('Source card not found.');
-        return;
+    if (sourcePageId === null || sourcePageId === undefined) {
+        // Handle unmatched cards - get card directly from parsedCards
+        console.log('Unmatched card - cardIndex:', cardIndex, 'parsedCards.length:', parsedCards.length);
+        sourceCard = parsedCards[cardIndex];
+        console.log('Retrieved sourceCard:', sourceCard);
+        if (!sourceCard) {
+            alert('Source card not found.');
+            return;
+        }
+        // For unmatched cards, remove from unlinked from all set if it exists
+        unlinkedFromAllCards.delete(cardIndex.toString());
+    } else {
+        // Handle cards that are already linked to a page
+        if (sourcePageId.startsWith('orphan-')) {
+            const orphanIndex = parseInt(sourcePageId.split('-')[1]);
+            sourcePage = sessionData.contentPages.filter(p => !p.sourceSearch)[orphanIndex];
+        } else {
+            const [_, groupIndex, pageIndex] = sourcePageId.split('-').map(Number);
+            const groups = groupSearchesAndPages();
+            if (groups[groupIndex] && groups[groupIndex].pages[pageIndex]) {
+                sourcePage = groups[groupIndex].pages[pageIndex];
+            }
+        }
+        
+        if (!sourcePage || !sourcePage.cards || !sourcePage.cards[cardIndex]) {
+            alert('Source card not found.');
+            return;
+        }
+        
+        sourceCard = sourcePage.cards[cardIndex];
+        cardArrayIndex = cardIndex;
     }
     
     // Get target page
@@ -5027,12 +5365,11 @@ function moveCardToPage(sourcePageId, cardIndex, targetPageId, matchScore, match
         return;
     }
     
-    // Get the card to move
-    const cardToMove = sourcePage.cards[cardIndex];
+    // Get the card to move (already set as sourceCard above)
     
     // Create new card object with updated match info
     const newCard = {
-        ...cardToMove,
+        ...sourceCard,
         matchScore: matchScore,
         matchDetails: {
             urlMatch: matchFields.includes('URL'),
@@ -5044,13 +5381,15 @@ function moveCardToPage(sourcePageId, cardIndex, targetPageId, matchScore, match
         }
     };
     
-    // Remove card from source page (and any pages with same URL)
-    const sourceUrl = sourcePage.url;
+    // Remove card from source page (and any pages with same URL) - only if there's a source page
     const removedCardData = [];
     
-    sessionData.contentPages.forEach((page, idx) => {
-        if (page.url === sourceUrl && page.cards) {
-            const cardIdx = page.cards.findIndex(c => c.cardIndex === cardToMove.cardIndex);
+    if (sourcePage) {
+        const sourceUrl = sourcePage.url;
+        
+        sessionData.contentPages.forEach((page, idx) => {
+            if (page.url === sourceUrl && page.cards) {
+                const cardIdx = page.cards.findIndex(c => c.cardIndex === sourceCard.cardIndex);
             if (cardIdx !== -1) {
                 const removedCard = page.cards.splice(cardIdx, 1)[0];
                 
@@ -5078,7 +5417,8 @@ function moveCardToPage(sourcePageId, cardIndex, targetPageId, matchScore, match
                 });
             }
         }
-    });
+        });
+    }
     
     // Add card to target page (and any pages with same URL)
     const targetUrl = targetPage.url;
@@ -5121,13 +5461,13 @@ function moveCardToPage(sourcePageId, cardIndex, targetPageId, matchScore, match
         targetPageId,
         removedCardData,
         addedCardData,
-        originalCard: cardToMove
+        originalCard: sourceCard
     };
     enableUndoButton();
     
-    // Update the cards modal if it's still showing the source page
+    // Update the cards modal if it's still showing the source page (only if there was a source page)
     const currentModal = document.getElementById('cardsModal');
-    if (currentModal && currentModal.style.display === 'block') {
+    if (currentModal && currentModal.style.display === 'block' && sourcePage) {
         const currentPageTitle = document.getElementById('cardsPageTitle').textContent;
         const sourcePageTitle = (sourcePage.metadata && sourcePage.metadata.title) || sourcePage.title || 'Unknown Page';
         
@@ -5138,6 +5478,11 @@ function moveCardToPage(sourcePageId, cardIndex, targetPageId, matchScore, match
     
     // Update timeline
     updateTimeline();
+    
+    // Call success callback if provided
+    if (successCallback && typeof successCallback === 'function') {
+        successCallback();
+    }
     
     // Show success message in move modal
     showMoveSuccessMessage(matchScore);

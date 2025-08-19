@@ -31,7 +31,10 @@
                                 <span class="progress-text">Parsing document sections...</span>
                             </div>
                             <a id="parsedSectionsLink" class="parsed-sections-link hidden" href="#">Parsed 0 Sections</a>
-                            <button id="unloadDOCX" class="unload-docx-btn hidden">Unload DOCX</button>
+                            <div class="docx-buttons">
+                                <button id="unloadDOCX" class="unload-docx-btn hidden">Unload DOCX</button>
+                                <button id="viewUnmatchedCards" class="view-unmatched-btn hidden">View Cards with No Match</button>
+                            </div>
                         </div>
                         <button id="loadSample">Load Sample JSON Data</button>
                     </div>
@@ -175,6 +178,7 @@
             </div>
         </div>
     </div>
+
 
     <!-- Add Mammoth.js for DOCX parsing -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
