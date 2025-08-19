@@ -2321,12 +2321,25 @@ function createPageItem(page, pageId, showNotes, showComments, showMetadata) {
     }
     actionButtons.appendChild(viewCardsBtn);
     
-    // Edit metadata button
+    // Edit and Move buttons container
+    const editMoveContainer = document.createElement('div');
+    editMoveContainer.className = 'edit-move-container';
+    
+    // Edit metadata button (half size)
     const editMetaBtn = document.createElement('button');
-    editMetaBtn.className = 'edit-meta-btn';
-    editMetaBtn.textContent = 'Edit Metadata';
+    editMetaBtn.className = 'edit-meta-btn half-btn';
+    editMetaBtn.textContent = 'Edit';
     editMetaBtn.onclick = function() { showMetadataForm(pageId, page, this); };
-    actionButtons.appendChild(editMetaBtn);
+    editMoveContainer.appendChild(editMetaBtn);
+    
+    // Move page button (half size)
+    const movePageBtn = document.createElement('button');
+    movePageBtn.className = 'move-page-btn half-btn';
+    movePageBtn.textContent = 'Move';
+    movePageBtn.onclick = function() { showMovePageModal(pageId, page); };
+    editMoveContainer.appendChild(movePageBtn);
+    
+    actionButtons.appendChild(editMoveContainer);
     
     // Remove button (teacher view only)
     if (viewMode === 'teacher') {
@@ -2486,6 +2499,9 @@ function enableUndoButton() {
                     break;
                 case 'moveCard':
                     undoBtn.textContent = 'Undo Move';
+                    break;
+                case 'movePageToSearch':
+                    undoBtn.textContent = 'Undo Move Page';
                     break;
                 default:
                     undoBtn.textContent = 'Undo';
@@ -2664,6 +2680,13 @@ function performUndo() {
                         showCardsModal(lastAction.sourcePageId, sourcePageData.page);
                     }
                 }
+            }
+            break;
+            
+        case 'movePageToSearch':
+            // Restore the page's original sourceSearch
+            if (lastAction.pageIndex !== undefined && sessionData.contentPages[lastAction.pageIndex]) {
+                sessionData.contentPages[lastAction.pageIndex].sourceSearch = lastAction.originalSourceSearch;
             }
             break;
     }
@@ -4800,9 +4823,12 @@ function showUnmatchedCardsModal() {
             
             // Show move card modal
             showMoveCardModal(null, cardIndex, cardHeader, () => {
-                // Close the unmatched cards modal and refresh timeline after move
-                modal.style.display = 'none';
+                // Refresh timeline and reopen the unmatched cards modal after move
                 updateTimeline();
+                // Small delay to ensure timeline is updated before reopening modal
+                setTimeout(() => {
+                    showUnmatchedCardsModal();
+                }, 100);
             });
         });
     });
@@ -5323,8 +5349,6 @@ function moveCardToPage(sourcePageId, cardIndex, targetPageId, matchScore, match
             alert('Source card not found.');
             return;
         }
-        // For unmatched cards, remove from unlinked from all set if it exists
-        unlinkedFromAllCards.delete(cardIndex.toString());
     } else {
         // Handle cards that are already linked to a page
         if (sourcePageId.startsWith('orphan-')) {
@@ -5346,6 +5370,10 @@ function moveCardToPage(sourcePageId, cardIndex, targetPageId, matchScore, match
         sourceCard = sourcePage.cards[cardIndex];
         cardArrayIndex = cardIndex;
     }
+    
+    // For any card being moved to a page, remove from unlinked from all set if it exists
+    unlinkedFromAllCards.delete(cardIndex.toString());
+    console.log('Removed card', cardIndex, 'from unlinkedFromAllCards. Set now contains:', Array.from(unlinkedFromAllCards));
     
     // Get target page
     let targetPage = null;
@@ -5370,6 +5398,7 @@ function moveCardToPage(sourcePageId, cardIndex, targetPageId, matchScore, match
     // Create new card object with updated match info
     const newCard = {
         ...sourceCard,
+        cardIndex: cardIndex, // Ensure cardIndex is preserved for matching
         matchScore: matchScore,
         matchDetails: {
             urlMatch: matchFields.includes('URL'),
@@ -6472,4 +6501,198 @@ function createMetadataStatusIndicators(originalMetadata, editedMetadata) {
     }
     
     return null;
+}
+
+// Function to show modal for moving a page to a different search
+function showMovePageModal(pageId, page) {
+    if (!sessionData || !sessionData.searches || sessionData.searches.length === 0) {
+        alert('No searches available to move this page to.');
+        return;
+    }
+
+    // Check if modal already exists and remove it
+    const existingModal = document.getElementById('movePageModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    // Create the modal
+    const modal = document.createElement('div');
+    modal.id = 'movePageModal';
+    modal.className = 'modal';
+
+    // Get current search info for comparison
+    const currentSearch = page.sourceSearch;
+    const currentSearchKey = currentSearch ? `${currentSearch.engine}-${currentSearch.query}` : null;
+
+    // Group searches by engine-query combination and count pages
+    const searchGroups = new Map();
+    const groups = groupSearchesAndPages();
+    
+    groups.forEach(group => {
+        const searchKey = `${group.engine}-${group.query}`;
+        if (searchKey !== currentSearchKey) { // Exclude current search
+            if (!searchGroups.has(searchKey)) {
+                searchGroups.set(searchKey, {
+                    engine: group.engine,
+                    query: group.query,
+                    firstTimestamp: group.firstTimestamp,
+                    pageCount: group.pages.length
+                });
+            }
+        }
+    });
+
+    // Convert to array and sort by timestamp (oldest to newest, like timeline)
+    const availableSearches = Array.from(searchGroups.values())
+        .sort((a, b) => new Date(a.firstTimestamp) - new Date(b.firstTimestamp));
+
+    if (availableSearches.length === 0) {
+        alert('No other searches available to move this page to.');
+        return;
+    }
+
+    modal.innerHTML = `
+        <div class="modal-content move-page-modal-content">
+            <div class="modal-header">
+                <h3>Move Page to Different Search</h3>
+                <button class="close-modal">&times;</button>
+            </div>
+            <div class="move-page-body">
+                <p>Select a search to move this page to:</p>
+                <div class="current-page-info" style="background-color: #f8f9fa; padding: 10px; border-radius: 4px; margin-bottom: 15px;">
+                    <strong>Moving page:</strong> ${page.title || new URL(page.url).hostname}<br>
+                    <small style="color: #666;">${page.url}</small>
+                    ${currentSearch ? `<br><strong>Current search:</strong> ${currentSearch.engine} - "${currentSearch.query}"` : '<br><strong>Currently:</strong> Direct page visit (no search)'}
+                </div>
+                <div class="search-selection-list" id="searchSelectionList">
+                    ${availableSearches.map((search, index) => `
+                        <div class="search-option" data-engine="${search.engine}" data-query="${search.query}" data-index="${index}">
+                            <div class="search-info">
+                                <div class="search-engine">${search.engine}</div>
+                                <div class="search-query">"${search.query}"</div>
+                            </div>
+                            <div style="display: flex; align-items: center;">
+                                <span class="search-timestamp">${formatTime(search.firstTimestamp)}</span>
+                                <span class="search-pages-count">${search.pageCount} page${search.pageCount !== 1 ? 's' : ''}</span>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+                <div class="move-page-buttons">
+                    <button class="move-page-cancel-btn">Cancel</button>
+                    <button class="move-page-confirm-btn" disabled>Move Page</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    // Handle search selection
+    let selectedSearchIndex = null;
+    const searchOptions = modal.querySelectorAll('.search-option');
+    const confirmBtn = modal.querySelector('.move-page-confirm-btn');
+
+    searchOptions.forEach((option, index) => {
+        option.addEventListener('click', () => {
+            // Remove previous selection
+            searchOptions.forEach(opt => opt.classList.remove('selected'));
+            
+            // Add selection to clicked option
+            option.classList.add('selected');
+            selectedSearchIndex = index;
+            
+            // Enable confirm button
+            confirmBtn.disabled = false;
+        });
+    });
+
+    // Handle confirm button
+    confirmBtn.addEventListener('click', () => {
+        if (selectedSearchIndex !== null) {
+            const selectedSearch = availableSearches[selectedSearchIndex];
+            movePageToSearch(pageId, page, selectedSearch.engine, selectedSearch.query);
+            modal.style.display = 'none';
+        }
+    });
+
+    // Handle cancel button
+    modal.querySelector('.move-page-cancel-btn').addEventListener('click', () => {
+        modal.style.display = 'none';
+    });
+
+    // Handle close button
+    modal.querySelector('.close-modal').addEventListener('click', () => {
+        modal.style.display = 'none';
+    });
+
+    // Close on outside click
+    window.onclick = (event) => {
+        if (event.target === modal) {
+            modal.style.display = 'none';
+        }
+    };
+
+    // Handle escape key
+    const escapeHandler = (event) => {
+        if (event.key === 'Escape') {
+            modal.style.display = 'none';
+            document.removeEventListener('keydown', escapeHandler);
+        }
+    };
+    document.addEventListener('keydown', escapeHandler);
+
+    // Show the modal
+    modal.style.display = 'block';
+}
+
+// Function to move a page to a different search
+function movePageToSearch(pageId, page, targetEngine, targetQuery) {
+    // Find the page in sessionData.contentPages using originalIndex or URL
+    let pageIndex = -1;
+    
+    if (page.originalIndex !== undefined) {
+        // Use originalIndex if available (from grouped pages)
+        pageIndex = page.originalIndex;
+    } else {
+        // Fallback to finding by URL
+        pageIndex = sessionData.contentPages.findIndex(p => p.url === page.url);
+    }
+    
+    if (pageIndex === -1 || !sessionData.contentPages[pageIndex]) {
+        console.error('Page not found. pageId:', pageId, 'originalIndex:', page.originalIndex, 'url:', page.url);
+        alert('Page not found in session data.');
+        return;
+    }
+
+    // Get the actual page from sessionData
+    const actualPage = sessionData.contentPages[pageIndex];
+    
+    // Store original search info for undo
+    const originalSourceSearch = actualPage.sourceSearch ? { ...actualPage.sourceSearch } : null;
+
+    // Update the page's sourceSearch property
+    actualPage.sourceSearch = {
+        engine: targetEngine,
+        query: targetQuery
+    };
+
+    // Track action for undo
+    lastAction = {
+        type: 'movePageToSearch',
+        pageId: pageId,
+        pageIndex: pageIndex,
+        originalSourceSearch: originalSourceSearch,
+        newSourceSearch: {
+            engine: targetEngine,
+            query: targetQuery
+        }
+    };
+    enableUndoButton();
+
+    // Update timeline to reflect the change
+    updateTimeline();
+
+    console.log(`Moved page "${actualPage.title || actualPage.url}" to search: ${targetEngine} - "${targetQuery}"`);
 }
