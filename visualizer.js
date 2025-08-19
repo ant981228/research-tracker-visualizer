@@ -2375,11 +2375,16 @@ function createPageItem(page, pageId, showNotes, showComments, showMetadata) {
     contentWrapper.appendChild(actionButtons);
     
     // Check if content is too narrow and switch to vertical layout
+    // Using hysteresis to prevent oscillation between layouts
     const checkLayout = () => {
         const contentWidth = content.offsetWidth;
-        if (contentWidth < 400) {
+        const isCurrentlyVertical = actionButtons.classList.contains('vertical');
+        
+        if (!isCurrentlyVertical && contentWidth < 350) {
+            // Switch to vertical layout (4x1) when content gets narrow
             actionButtons.classList.add('vertical');
-        } else {
+        } else if (isCurrentlyVertical && contentWidth > 500) {
+            // Switch back to grid layout (2x2) when content gets wide enough  
             actionButtons.classList.remove('vertical');
         }
     };
