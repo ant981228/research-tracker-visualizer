@@ -429,6 +429,10 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('showPages').addEventListener('change', updateTimeline);
     document.getElementById('showMetadata').addEventListener('change', updateTimeline);
     document.getElementById('showComments').addEventListener('change', updateTimeline);
+    document.getElementById('showEditingTools').addEventListener('change', () => {
+        updateTimeline();
+        updateActionsVisibility();
+    });
     
     // Export buttons
     document.getElementById('exportComments').addEventListener('click', exportComments);
@@ -572,6 +576,9 @@ function processSessionData() {
     document.getElementById('actionsBox').classList.remove('hidden');
     document.getElementById('visualization').classList.remove('hidden');
     
+    // Update editing tools visibility
+    updateActionsVisibility();
+    
     // Update session info
     updateSessionInfo();
     
@@ -600,6 +607,7 @@ function updateTimeline() {
     const showPages = document.getElementById('showPages').checked;
     const showMetadata = document.getElementById('showMetadata').checked;
     const showComments = document.getElementById('showComments').checked;
+    const showEditingTools = document.getElementById('showEditingTools').checked;
     
     const timelineContent = document.getElementById('timelineContent');
     timelineContent.innerHTML = '';
@@ -616,7 +624,7 @@ function updateTimeline() {
     
     // Create timeline items for each search group
     searchGroups.forEach((group, groupIndex) => {
-        const searchContainer = createSearchContainer(group, groupIndex, showPages, showComments, showMetadata);
+        const searchContainer = createSearchContainer(group, groupIndex, showPages, showComments, showMetadata, showEditingTools);
         timelineContent.appendChild(searchContainer);
     });
     
@@ -653,7 +661,7 @@ function updateTimeline() {
             directContainer.appendChild(directHeader);
             
             allPagesFiltered.forEach(({ page, pageId }) => {
-                const pageItem = createPageItem(page, pageId, showComments, showMetadata);
+                const pageItem = createPageItem(page, pageId, showComments, showMetadata, showEditingTools);
                 directContainer.appendChild(pageItem);
             });
             
@@ -670,7 +678,7 @@ function updateTimeline() {
         orphanContainer.appendChild(orphanHeader);
         
         orphanedPagesFiltered.forEach(({ page, pageId }) => {
-            const pageItem = createPageItem(page, pageId, showComments, showMetadata);
+            const pageItem = createPageItem(page, pageId, showComments, showMetadata, showEditingTools);
             orphanContainer.appendChild(pageItem);
         });
         
@@ -1903,7 +1911,7 @@ function groupSearchesAndPages() {
     return groups;
 }
 
-function createSearchContainer(group, groupIndex, showPages, showComments, showMetadata) {
+function createSearchContainer(group, groupIndex, showPages, showComments, showMetadata, showEditingTools) {
     const container = document.createElement('div');
     container.className = 'search-group';
     container.dataset.groupIndex = groupIndex;
@@ -1978,7 +1986,7 @@ function createSearchContainer(group, groupIndex, showPages, showComments, showM
     }
     
     // Add remove search button
-    if (viewMode === 'teacher') {
+    if (viewMode === 'teacher' && showEditingTools) {
         const searchActions = document.createElement('div');
         searchActions.className = 'search-actions';
         
@@ -2027,7 +2035,7 @@ function createSearchContainer(group, groupIndex, showPages, showComments, showM
         group.pages.forEach((page, pageIndex) => {
             const pageId = `page-${groupIndex}-${pageIndex}`;
             if (!removedPages.has(pageId)) {
-                const pageItem = createPageItem(page, pageId, showComments, showMetadata);
+                const pageItem = createPageItem(page, pageId, showComments, showMetadata, showEditingTools);
                 pagesContainer.appendChild(pageItem);
             }
         });
@@ -2038,7 +2046,7 @@ function createSearchContainer(group, groupIndex, showPages, showComments, showM
     return container;
 }
 
-function createPageItem(page, pageId, showComments, showMetadata) {
+function createPageItem(page, pageId, showComments, showMetadata, showEditingTools) {
     const item = document.createElement('div');
     item.className = 'page-item';
     
@@ -2319,28 +2327,30 @@ function createPageItem(page, pageId, showComments, showMetadata) {
     }
     actionButtons.appendChild(viewCardsBtn);
     
-    // Edit and Move buttons container
-    const editMoveContainer = document.createElement('div');
-    editMoveContainer.className = 'edit-move-container';
+    // Edit and Move buttons container (only show if editing tools enabled)
+    if (showEditingTools) {
+        const editMoveContainer = document.createElement('div');
+        editMoveContainer.className = 'edit-move-container';
+        
+        // Edit metadata button (half size)
+        const editMetaBtn = document.createElement('button');
+        editMetaBtn.className = 'edit-meta-btn half-btn';
+        editMetaBtn.textContent = 'Edit';
+        editMetaBtn.onclick = function() { showMetadataForm(pageId, page, this); };
+        editMoveContainer.appendChild(editMetaBtn);
+        
+        // Move page button (half size)
+        const movePageBtn = document.createElement('button');
+        movePageBtn.className = 'move-page-btn half-btn';
+        movePageBtn.textContent = 'Move';
+        movePageBtn.onclick = function() { showMovePageModal(pageId, page); };
+        editMoveContainer.appendChild(movePageBtn);
+        
+        actionButtons.appendChild(editMoveContainer);
+    }
     
-    // Edit metadata button (half size)
-    const editMetaBtn = document.createElement('button');
-    editMetaBtn.className = 'edit-meta-btn half-btn';
-    editMetaBtn.textContent = 'Edit';
-    editMetaBtn.onclick = function() { showMetadataForm(pageId, page, this); };
-    editMoveContainer.appendChild(editMetaBtn);
-    
-    // Move page button (half size)
-    const movePageBtn = document.createElement('button');
-    movePageBtn.className = 'move-page-btn half-btn';
-    movePageBtn.textContent = 'Move';
-    movePageBtn.onclick = function() { showMovePageModal(pageId, page); };
-    editMoveContainer.appendChild(movePageBtn);
-    
-    actionButtons.appendChild(editMoveContainer);
-    
-    // Remove button (teacher view only)
-    if (viewMode === 'teacher') {
+    // Remove button (teacher view only and editing tools enabled)
+    if (viewMode === 'teacher' && showEditingTools) {
         const removeBtn = document.createElement('button');
         removeBtn.className = 'remove-page-btn';
         removeBtn.textContent = 'Remove';
@@ -4391,7 +4401,11 @@ function updatePageMetadataDisplay(page, pageId) {
 }
 
 // Function to show cards modal
-function showCardsModal(pageId, page) {
+function showCardsModal(pageId, page, showEditingTools = null) {
+    if (showEditingTools === null) {
+        const checkbox = document.getElementById('showEditingTools');
+        showEditingTools = checkbox ? checkbox.checked : false;
+    }
     // Create modal if it doesn't exist
     let modal = document.getElementById('cardsModal');
     if (!modal) {
@@ -4486,9 +4500,11 @@ function showCardsModal(pageId, page) {
                         <span class="weighting-method">Method: ${weightingMethod}</span>
                     </div>
                     <div class="card-actions">
+                        ${showEditingTools ? `
                         <button class="move-card-btn" data-page-id="${pageId}" data-card-index="${card.cardIndex !== undefined ? card.cardIndex : index}" data-card-header="${card.header.replace(/"/g, '&quot;')}">Move</button>
                         <button class="unlink-card-btn" onclick="unlinkCard('${pageId}', ${card.cardIndex !== undefined ? card.cardIndex : index})">Unlink from Page</button>
                         <button class="unlink-all-card-btn" onclick="unlinkCardFromAll('${pageId}', ${card.cardIndex !== undefined ? card.cardIndex : index})">Unlink from All</button>
+                        ` : ''}
                     </div>
                 </div>
             </div>
@@ -4701,7 +4717,11 @@ function unlinkCardFromAll(pageId, cardIndex) {
 }
 
 // Function to show unmatched cards modal
-function showUnmatchedCardsModal() {
+function showUnmatchedCardsModal(showEditingTools = null) {
+    if (showEditingTools === null) {
+        const checkbox = document.getElementById('showEditingTools');
+        showEditingTools = checkbox ? checkbox.checked : false;
+    }
     if (!parsedCards || parsedCards.length === 0) {
         alert('No cards have been parsed from a DOCX file.');
         return;
@@ -4807,7 +4827,7 @@ function showUnmatchedCardsModal() {
                         <span class="match-status">Status: Unmatched</span>
                     </div>
                     <div class="card-actions">
-                        <button class="move-card-btn" data-card-index="${originalIndex}" data-card-header="${card.header.replace(/"/g, '&quot;')}">Link to Page</button>
+                        ${showEditingTools ? `<button class="move-card-btn" data-card-index="${originalIndex}" data-card-header="${card.header.replace(/"/g, '&quot;')}">Link to Page</button>` : ''}
                     </div>
                 </div>
             </div>
@@ -6698,4 +6718,24 @@ function movePageToSearch(pageId, page, targetEngine, targetQuery) {
     updateTimeline();
 
     console.log(`Moved page "${actualPage.title || actualPage.url}" to search: ${targetEngine} - "${targetQuery}"`);
+}
+
+// Function to update actions visibility based on editing tools checkbox
+function updateActionsVisibility() {
+    const showEditingTools = document.getElementById('showEditingTools').checked;
+    
+    // Update actions block buttons
+    const undoBtn = document.getElementById('undoBtn');
+    const rematchBtn = document.getElementById('rematchCards');
+    const restoreBtn = document.getElementById('restorePages');
+    
+    if (undoBtn) {
+        undoBtn.style.display = showEditingTools ? 'block' : 'none';
+    }
+    if (rematchBtn) {
+        rematchBtn.style.display = showEditingTools ? 'block' : 'none';
+    }
+    if (restoreBtn) {
+        restoreBtn.style.display = showEditingTools ? 'block' : 'none';
+    }
 }
