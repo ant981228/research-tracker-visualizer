@@ -428,7 +428,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // Timeline filters
     document.getElementById('showPages').addEventListener('change', updateTimeline);
     document.getElementById('showMetadata').addEventListener('change', updateTimeline);
-    document.getElementById('showNotes').addEventListener('change', updateTimeline);
     document.getElementById('showComments').addEventListener('change', updateTimeline);
     
     // Export buttons
@@ -600,7 +599,6 @@ function updateSessionInfo() {
 function updateTimeline() {
     const showPages = document.getElementById('showPages').checked;
     const showMetadata = document.getElementById('showMetadata').checked;
-    const showNotes = document.getElementById('showNotes').checked;
     const showComments = document.getElementById('showComments').checked;
     
     const timelineContent = document.getElementById('timelineContent');
@@ -618,7 +616,7 @@ function updateTimeline() {
     
     // Create timeline items for each search group
     searchGroups.forEach((group, groupIndex) => {
-        const searchContainer = createSearchContainer(group, groupIndex, showPages, showNotes, showComments, showMetadata);
+        const searchContainer = createSearchContainer(group, groupIndex, showPages, showComments, showMetadata);
         timelineContent.appendChild(searchContainer);
     });
     
@@ -655,7 +653,7 @@ function updateTimeline() {
             directContainer.appendChild(directHeader);
             
             allPagesFiltered.forEach(({ page, pageId }) => {
-                const pageItem = createPageItem(page, pageId, showNotes, showComments, showMetadata);
+                const pageItem = createPageItem(page, pageId, showComments, showMetadata);
                 directContainer.appendChild(pageItem);
             });
             
@@ -672,7 +670,7 @@ function updateTimeline() {
         orphanContainer.appendChild(orphanHeader);
         
         orphanedPagesFiltered.forEach(({ page, pageId }) => {
-            const pageItem = createPageItem(page, pageId, showNotes, showComments, showMetadata);
+            const pageItem = createPageItem(page, pageId, showComments, showMetadata);
             orphanContainer.appendChild(pageItem);
         });
         
@@ -1905,7 +1903,7 @@ function groupSearchesAndPages() {
     return groups;
 }
 
-function createSearchContainer(group, groupIndex, showPages, showNotes, showComments, showMetadata) {
+function createSearchContainer(group, groupIndex, showPages, showComments, showMetadata) {
     const container = document.createElement('div');
     container.className = 'search-group';
     container.dataset.groupIndex = groupIndex;
@@ -1955,7 +1953,7 @@ function createSearchContainer(group, groupIndex, showPages, showNotes, showComm
     searchInfo.appendChild(details);
     
     // Add notes from all searches in this group
-    if (showNotes) {
+    if (showMetadata) {
         group.searches.forEach(search => {
             if (search.notes && search.notes.length > 0) {
                 search.notes.forEach(note => {
@@ -2029,7 +2027,7 @@ function createSearchContainer(group, groupIndex, showPages, showNotes, showComm
         group.pages.forEach((page, pageIndex) => {
             const pageId = `page-${groupIndex}-${pageIndex}`;
             if (!removedPages.has(pageId)) {
-                const pageItem = createPageItem(page, pageId, showNotes, showComments, showMetadata);
+                const pageItem = createPageItem(page, pageId, showComments, showMetadata);
                 pagesContainer.appendChild(pageItem);
             }
         });
@@ -2040,7 +2038,7 @@ function createSearchContainer(group, groupIndex, showPages, showNotes, showComm
     return container;
 }
 
-function createPageItem(page, pageId, showNotes, showComments, showMetadata) {
+function createPageItem(page, pageId, showComments, showMetadata) {
     const item = document.createElement('div');
     item.className = 'page-item';
     
@@ -2271,7 +2269,7 @@ function createPageItem(page, pageId, showNotes, showComments, showMetadata) {
     }
     
     // Add notes
-    if (showNotes && page.notes && page.notes.length > 0) {
+    if (showMetadata && page.notes && page.notes.length > 0) {
         page.notes.forEach(note => {
             const noteDiv = document.createElement('div');
             noteDiv.className = 'event-note';
