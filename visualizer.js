@@ -1291,8 +1291,8 @@ function mapContentType(apiType) {
 
 // Comment functions
 function assessSourceType(page) {
-    const url = page.url.toLowerCase();
-    let domain = new URL(page.url).hostname.toLowerCase();
+    const url = String(page.url).toLowerCase();
+    let domain = new URL(String(page.url)).hostname.toLowerCase();
     const metadata = page.metadata || {};
     
     // Helper function to check if domain matches (including proxy versions)
@@ -1301,8 +1301,8 @@ function assessSourceType(page) {
         if (checkDomain.includes(pattern)) return true;
         
         // Normalize both domain and pattern by removing punctuation
-        const normalizedDomain = checkDomain.replace(/[-_.]/g, '');
-        const normalizedPattern = pattern.replace(/[-_.]/g, '');
+        const normalizedDomain = String(checkDomain).replace(/[-_.]/g, '');
+        const normalizedPattern = String(pattern).replace(/[-_.]/g, '');
         
         // Check if normalized domain contains normalized pattern
         return normalizedDomain.includes(normalizedPattern);
@@ -1553,7 +1553,7 @@ function showCommentForm(eventId, event, existingComment = null, buttonElement =
 }
 
 function saveComment(eventId, content, event) {
-    if (!content.trim()) return;
+    if (!content || !String(content).trim()) return;
     
     // Save previous state for undo
     const previousComment = commentData[eventId] ? { ...commentData[eventId] } : null;
@@ -1838,9 +1838,9 @@ function shouldFilterPage(page) {
     if (!page.title || 
         page.title === 'New Tab' || 
         page.title === 'Blank' ||
-        page.title.includes('404') ||
-        page.title.includes('Error') ||
-        page.title.includes('Not Found')) {
+        (typeof page.title === 'string' && page.title.includes('404')) ||
+        (typeof page.title === 'string' && page.title.includes('Error')) ||
+        (typeof page.title === 'string' && page.title.includes('Not Found'))) {
         return true;
     }
     
@@ -1849,8 +1849,8 @@ function shouldFilterPage(page) {
         url.includes('/signin') || 
         url.includes('/auth') ||
         url.includes('/oauth') ||
-        page.title.toLowerCase().includes('sign in') ||
-        page.title.toLowerCase().includes('log in')) {
+        (page.title && typeof page.title === 'string' && page.title.toLowerCase().includes('sign in')) ||
+        (page.title && typeof page.title === 'string' && page.title.toLowerCase().includes('log in'))) {
         return true;
     }
     
@@ -2081,6 +2081,9 @@ function createPageItem(page, pageId, showComments, showMetadata, showEditingToo
         // Prefer metadata.title over top-level title as it's usually more accurate
         pageTitle = (page.metadata && page.metadata.title) || page.title;
     }
+    
+    // Ensure pageTitle is a string
+    pageTitle = pageTitle ? String(pageTitle) : '';
     
     // If no title available, show a cleaned-up version of the URL
     if (!pageTitle || pageTitle.trim() === '') {
@@ -2958,7 +2961,7 @@ function showMetadataForm(pageId, page, buttonElement) {
         }
         
         // Handle authors as array if multiple authors separated by commas
-        if (newMetadata.author && newMetadata.author.includes(',')) {
+        if (newMetadata.author && typeof newMetadata.author === 'string' && newMetadata.author.includes(',')) {
             newMetadata.authors = newMetadata.author.split(',').map(a => a.trim());
         }
         
@@ -3820,15 +3823,15 @@ function matchCardsToPages() {
             // Get page metadata
             const edited = editedMetadata[`page-${pageIndex}-0`] || {};
             const metadata = page.metadata || {};
-            const pageTitle = edited.title || metadata.title || page.title || '';
+            const pageTitle = String(edited.title || metadata.title || page.title || '');
             const pageUrl = page.url || '';
-            const author = edited.author || metadata.author || '';
+            const author = String(edited.author || metadata.author || '');
             const authors = edited.authors || metadata.authors || [];
-            const publishDate = edited.publishDate || metadata.publishDate || '';
-            const publisher = edited.publisher || metadata.publisher || '';
-            const journal = edited.journal || metadata.journal || '';
-            const publicationInfo = edited.publicationInfo || metadata.publicationInfo || '';
-            const pages = edited.pages || metadata.pages || '';
+            const publishDate = String(edited.publishDate || metadata.publishDate || '');
+            const publisher = String(edited.publisher || metadata.publisher || '');
+            const journal = String(edited.journal || metadata.journal || '');
+            const publicationInfo = String(edited.publicationInfo || metadata.publicationInfo || '');
+            const pages = String(edited.pages || metadata.pages || '');
             
             if (cardIndex === 0 && pageIndex === 0) {
                 console.log('Sample page metadata:', {
@@ -3876,8 +3879,8 @@ function matchCardsToPages() {
             if (publishDate) {
                 const dateVariations = [
                     publishDate,
-                    publishDate.replace(/-/g, '/'),
-                    publishDate.replace(/-/g, ' ')
+                    String(publishDate).replace(/-/g, '/'),
+                    String(publishDate).replace(/-/g, ' ')
                 ];
                 const dateScore = calculateMatchScore(cardText, dateVariations, true, urlCutoffPosition);
                 if (dateScore > 0) {
@@ -4121,13 +4124,13 @@ function rematchCardsToPages() {
             // Get page metadata (including edited metadata)
             const edited = editedMetadata[`page-${pageIndex}-0`] || {};
             const metadata = page.metadata || {};
-            const pageTitle = edited.title || metadata.title || page.title || '';
+            const pageTitle = String(edited.title || metadata.title || page.title || '');
             const pageUrl = page.url || '';
-            const author = edited.author || metadata.author || '';
+            const author = String(edited.author || metadata.author || '');
             const authors = edited.authors || metadata.authors || [];
-            const publishDate = edited.publishDate || metadata.publishDate || '';
-            const journal = edited.journal || metadata.journal || '';
-            const publisher = edited.publisher || metadata.publisher || '';
+            const publishDate = String(edited.publishDate || metadata.publishDate || '');
+            const journal = String(edited.journal || metadata.journal || '');
+            const publisher = String(edited.publisher || metadata.publisher || '');
             
             // URL matching logic (same as original)
             try {
@@ -4170,7 +4173,7 @@ function rematchCardsToPages() {
             if (allAuthors.length > 0 && cardText) {
                 const cardTextLower = cardText.toLowerCase();
                 const hasAuthorMatch = allAuthors.some(authorName => {
-                    const nameParts = authorName.toLowerCase().split(/\s+/);
+                    const nameParts = String(authorName).toLowerCase().split(/\s+/);
                     return nameParts.some(part => part.length > 2 && cardTextLower.includes(part));
                 });
                 
@@ -4182,7 +4185,7 @@ function rematchCardsToPages() {
             
             // Date matching
             if (publishDate && cardText) {
-                const year = publishDate.substring(0, 4);
+                const year = String(publishDate).substring(0, 4);
                 if (year && cardText.includes(year)) {
                     score += 2;
                     matchDetails.dateMatch = true;
@@ -4194,7 +4197,7 @@ function rematchCardsToPages() {
             if (publications.length > 0 && cardText) {
                 const cardTextLower = cardText.toLowerCase();
                 const hasPublicationMatch = publications.some(pub => {
-                    const pubWords = pub.toLowerCase().split(/\s+/);
+                    const pubWords = String(pub).toLowerCase().split(/\s+/);
                     return pubWords.some(word => word.length > 3 && cardTextLower.includes(word));
                 });
                 
@@ -4501,7 +4504,7 @@ function showCardsModal(pageId, page, showEditingTools = null) {
                     </div>
                     <div class="card-actions">
                         ${showEditingTools ? `
-                        <button class="move-card-btn" data-page-id="${pageId}" data-card-index="${card.cardIndex !== undefined ? card.cardIndex : index}" data-card-header="${card.header.replace(/"/g, '&quot;')}">Move</button>
+                        <button class="move-card-btn" data-page-id="${pageId}" data-card-index="${card.cardIndex !== undefined ? card.cardIndex : index}" data-card-header="${card.header ? card.header.replace(/"/g, '&quot;') : ''}">Move</button>
                         <button class="unlink-card-btn" onclick="unlinkCard('${pageId}', ${card.cardIndex !== undefined ? card.cardIndex : index})">Unlink from Page</button>
                         <button class="unlink-all-card-btn" onclick="unlinkCardFromAll('${pageId}', ${card.cardIndex !== undefined ? card.cardIndex : index})">Unlink from All</button>
                         ` : ''}
@@ -4827,7 +4830,7 @@ function showUnmatchedCardsModal(showEditingTools = null) {
                         <span class="match-status">Status: Unmatched</span>
                     </div>
                     <div class="card-actions">
-                        ${showEditingTools ? `<button class="move-card-btn" data-card-index="${originalIndex}" data-card-header="${card.header.replace(/"/g, '&quot;')}">Link to Page</button>` : ''}
+                        ${showEditingTools ? `<button class="move-card-btn" data-card-index="${originalIndex}" data-card-header="${card.header ? card.header.replace(/"/g, '&quot;') : ''}">Link to Page</button>` : ''}
                     </div>
                 </div>
             </div>
@@ -4866,9 +4869,10 @@ function createMetadataTooltip(metadata, page) {
     
     // Helper function to add metadata field if it exists
     const addField = (label, value) => {
-        if (value && value.trim()) {
+        if (value && String(value).trim()) {
             // Limit each field to reasonable length for tooltip
-            const truncatedValue = value.length > 100 ? value.substring(0, 97) + '...' : value;
+            const stringValue = String(value);
+            const truncatedValue = stringValue.length > 100 ? stringValue.substring(0, 97) + '...' : stringValue;
             items.push(`${label}: ${truncatedValue}`);
         }
     };
@@ -5225,12 +5229,12 @@ function getAllPagesWithMatchScores(card, excludePageId) {
         
         // Get page metadata
         const metadata = page.metadata || {};
-        const title = metadata.title || page.title || '';
-        const author = metadata.author || '';
+        const title = String(metadata.title || page.title || '');
+        const author = String(metadata.author || '');
         const authors = metadata.authors || [];
-        const publishDate = metadata.publishDate || '';
-        const journal = metadata.journal || '';
-        const publisher = metadata.publisher || '';
+        const publishDate = String(metadata.publishDate || '');
+        const journal = String(metadata.journal || '');
+        const publisher = String(metadata.publisher || '');
         
         // URL match (domain comparison)
         try {
@@ -5273,7 +5277,7 @@ function getAllPagesWithMatchScores(card, excludePageId) {
         if (allAuthors.length > 0 && card.contentText) {
             const cardText = card.contentText.toLowerCase();
             const hasAuthorMatch = allAuthors.some(authorName => {
-                const nameParts = authorName.toLowerCase().split(/\s+/);
+                const nameParts = String(authorName).toLowerCase().split(/\s+/);
                 return nameParts.some(part => part.length > 2 && cardText.includes(part));
             });
             
@@ -5285,7 +5289,7 @@ function getAllPagesWithMatchScores(card, excludePageId) {
         
         // Date match
         if (publishDate && card.contentText) {
-            const year = publishDate.substring(0, 4);
+            const year = String(publishDate).substring(0, 4);
             if (year && card.contentText.includes(year)) {
                 score += 2;
                 matchFields.push('Date');
@@ -5294,7 +5298,7 @@ function getAllPagesWithMatchScores(card, excludePageId) {
         
         // Publication match (journal or publisher)
         if ((journal || publisher) && card.contentText) {
-            const pubName = (journal || publisher).toLowerCase();
+            const pubName = String(journal || publisher).toLowerCase();
             const pubWords = pubName.split(/\s+/);
             const cardText = card.contentText.toLowerCase();
             
