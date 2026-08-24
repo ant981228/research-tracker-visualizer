@@ -511,9 +511,46 @@ function loadSampleData() {
     processSessionData();
 }
 
+function inheritSourceSearches() {
+    // v2 exports stamp sourceSearch only on the page clicked directly
+    // off a search results page; pages reached by navigating onward
+    // carry parentVisitId lineage instead. Walk those chains here so
+    // "linked to a search" means what a reader expects — rooted in a
+    // search, whether directly or via a chain of links — instead of
+    // only counting direct SERP clicks. Inherited stamps are flagged
+    // (sourceSearchInherited) so displays can say "via links" and
+    // nothing mistakes them for a direct result click.
+    const pages = sessionData.contentPages || [];
+    const byVisitId = new Map();
+    for (const page of pages) {
+        const vid = page.rtId ?? page.attribution?.visitId;
+        if (vid !== undefined && vid !== null) byVisitId.set(vid, page);
+    }
+    const resolve = (page, seen) => {
+        if (page.sourceSearch) return page.sourceSearch;
+        const parentId = page.parentVisitId ?? page.attribution?.parentVisitId;
+        if (parentId === undefined || parentId === null || seen.has(parentId)) return null;
+        seen.add(parentId);
+        const parent = byVisitId.get(parentId);
+        return parent ? resolve(parent, seen) : null;
+    };
+    for (const page of pages) {
+        if (page.sourceSearch) continue;
+        const inherited = resolve(page, new Set());
+        if (inherited) {
+            page.sourceSearch = inherited;
+            page.sourceSearchInherited = true;
+        }
+    }
+}
+
 function processSessionData() {
     if (!sessionData) return;
-    
+
+    // Resolve link-chain lineage into sourceSearch stamps before any
+    // grouping/orphan logic reads the flat field.
+    inheritSourceSearches();
+
     // Clear previous session data
     removedPages.clear();
     removedSearches.clear();
@@ -774,7 +811,9 @@ function createTimelineItem(event, index) {
         details.textContent = domain;
         
         if (event.sourceSearch) {
-            details.textContent += ` (from search: "${event.sourceSearch.query}")`;
+            details.textContent += event.sourceSearchInherited
+                ? ` (via links from search: "${event.sourceSearch.query}")`
+                : ` (from search: "${event.sourceSearch.query}")`;
         }
         
         content.appendChild(titleDiv);
